@@ -35,7 +35,7 @@ Fixltpro is a comprehensive IT support ticketing platform designed for Arabic-sp
 
 1. Clone the repository or download the source code:
    ```
-   git clone https://github.com/yourusername/fixltpro.git
+   git clone https://github.com/Daghriry/Fixltpro.git
    cd fixltpro
    ```
 
