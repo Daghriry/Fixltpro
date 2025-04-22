@@ -2,7 +2,8 @@
 
 Fixltpro is a comprehensive IT support ticketing platform designed for Arabic-speaking organizations. This web-based system helps manage and track computer-related issues through an organized workflow.
 
-![Fixltpro](https://via.placeholder.com/800x400?text=Fixltpro+IT+Support+Ticketing+System)
+![image](https://github.com/user-attachments/assets/cca87dc3-1c0b-4b58-9b96-37543935e2e2)
+
 
 ## Features
 
