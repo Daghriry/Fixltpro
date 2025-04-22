@@ -1,0 +1,266 @@
+/* تنسيقات عامة للتطبيق */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+/* تنسيقات البطاقات */
+.card {
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    border: none;
+}
+
+.card-header {
+    font-weight: bold;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 0;
+    background-color: #f8f9fc;
+    border-bottom: 1px solid #e3e6f0;
+}
+
+/* تنسيقات أولويات البلاغات */
+.priority-high {
+    background-color: #ffecec;
+    border-right: 4px solid #FF0000;
+}
+
+.priority-medium {
+    background-color: #fff8ec;
+    border-right: 4px solid #FFAA00;
+}
+
+.priority-low {
+    background-color: #ecffec;
+    border-right: 4px solid #00AA00;
+}
+
+/* تنسيقات البلاغات */
+.ticket-info {
+    margin-bottom: 0.75rem;
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+
+/* تنسيقات التعليقات */
+.comment-box {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* تنسيقات الرسائل */
+.flash-messages {
+    margin-top: 20px;
+}
+
+/* تنسيقات خاصة بالتقارير والإحصائيات */
+.progress {
+    height: 10px;
+    margin-top: 5px;
+}
+
+/* تصحيح عرض الجداول */
+.table-responsive {
+    overflow-x: auto;
+}
+
+/* تنسيقات للوحات المعلومات */
+.btn-group .btn.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+/* تنسيقات للنوافذ المنبثقة */
+.modal-header {
+    border-top-left-radius: 0.3rem;
+    border-top-right-radius: 0.3rem;
+}
+
+/* تنسيقات للوحة الإحصائيات */
+.card-body .fa-3x {
+    opacity: 0.5;
+}
+
+/* تنسيقات عامة للتطبيق */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+}
+
+/* تنسيقات البطاقات */
+.card {
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0.15rem 1.75rem 0 rgba(58, 59, 69, 0.15);
+    border: none;
+}
+
+.card-header {
+    font-weight: bold;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 0;
+    background-color: #f8f9fc;
+    border-bottom: 1px solid #e3e6f0;
+}
+
+/* تنسيقات أولويات البلاغات */
+.priority-high {
+    background-color: #ffecec;
+    border-right: 4px solid #FF0000;
+}
+
+.priority-medium {
+    background-color: #fff8ec;
+    border-right: 4px solid #FFAA00;
+}
+
+.priority-low {
+    background-color: #ecffec;
+    border-right: 4px solid #00AA00;
+}
+
+/* تنسيقات البلاغات */
+.ticket-info {
+    margin-bottom: 0.75rem;
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    padding: 4px 8px;
+}
+
+/* تنسيقات التعليقات */
+.comment-box {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.comment-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+    font-size: 0.9rem;
+    color: #6c757d;
+}
+
+/* تنسيقات الرسائل */
+.flash-messages {
+    margin-top: 20px;
+}
+
+/* تنسيقات خاصة بالتقارير والإحصائيات */
+.progress {
+    height: 10px;
+    margin-top: 5px;
+}
+
+/* تصحيح عرض الجداول */
+.table-responsive {
+    overflow-x: auto;
+}
+
+/* تنسيقات للوحات المعلومات */
+.btn-group .btn.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+/* تنسيقات للنوافذ المنبثقة */
+.modal-header {
+    border-top-left-radius: 0.3rem;
+    border-top-right-radius: 0.3rem;
+}
+
+/* تنسيقات للوحة الإحصائيات */
+.card-body .fa-3x {
+    opacity: 0.5;
+}
+
+/* تنسيقات إضافية لتجنب مشاكل CSS مع Jinja */
+/* أنماط شارات الأولويات */
+.priority-badge {
+    padding: 0.35em 0.65em;
+    font-size: 0.75em;
+    font-weight: 700;
+    color: #fff;
+    border-radius: 0.25rem;
+}
+
+/* أنماط لتجنب تداخل CSS مع Jinja */
+.priority-color-high {
+    background-color: #e74a3b !important;
+}
+
+.priority-color-medium {
+    background-color: #f6c23e !important;
+}
+
+.priority-color-low {
+    background-color: #1cc88a !important;
+}
+
+.support-info {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.support-info p {
+    font-size: 14px;
+    color: #ffffff; /* Changed to white for better visibility */
+}
+
+.contact-link {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 5px;
+    color: #ffffff; /* Changed to white to match the text */
+    text-decoration: none;
+    transition: color 0.2s;
+}
+
+.contact-link:hover {
+    color: #e6e6e6; /* Slightly darker white on hover */
+}
+
+.contact-link i {
+    margin-inline-end: 5px;
+}
+
+.whatsapp-link {
+    color: #25D366; /* WhatsApp green color */
+}
+
+.whatsapp-link:hover {
+    color: #128C7E; /* Darker WhatsApp green on hover */
+}
+
+.separator {
+    color: #ffffff; /* Changed to white to match the text */
+    margin: 0 5px;
+}

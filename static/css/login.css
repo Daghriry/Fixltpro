@@ -1,0 +1,189 @@
+/* login.css */
+:root {
+    --primary-color: #2c3e50;
+    --secondary-color: #3498db;
+    --accent-color: #e74c3c;
+    --light-color: #ecf0f1;
+    --dark-color: #2c3e50;
+    --success-color: #2ecc71;
+    --warning-color: #f39c12;
+    --danger-color: #e74c3c;
+}
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    padding: 2rem 1rem;
+}
+
+.login-box {
+    width: 100%;
+    max-width: 460px;
+    text-align: center;
+}
+
+.logo-container {
+    margin-bottom: 2rem;
+}
+
+.logo-container img {
+    max-width: 80px;
+    margin-bottom: 1rem;
+}
+
+.logo-container h1 {
+    color: white;
+    font-weight: 700;
+    margin: 0;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: white;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 2rem 2rem 1rem;
+    text-align: center;
+}
+
+.card-header h2 {
+    color: var(--primary-color);
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.card-header p {
+    color: #666;
+    margin-bottom: 0;
+}
+
+.card-body {
+    padding: 2rem;
+}
+
+.card-footer {
+    background-color: white;
+    border-top: 1px solid rgba(0, 0, 0, 0.05);
+    padding: 1rem 2rem;
+    text-align: center;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+    text-align: right;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--dark-color);
+}
+
+.input-group {
+    direction: rtl;
+}
+
+.input-group-text {
+    background-color: var(--light-color);
+    color: var(--dark-color);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    border-top-right-radius: 6px;
+    border-bottom-right-radius: 6px;
+}
+
+.form-control {
+    height: 48px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+    border-top-left-radius: 6px;
+    border-bottom-left-radius: 6px;
+}
+
+.form-check {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    text-align: right;
+    direction: rtl;
+}
+
+.form-check-input {
+    margin-right: 0;
+    margin-left: 0.5rem;
+}
+
+.btn-primary {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+}
+
+.btn-primary:hover {
+    background-color: #2980b9;
+    border-color: #2980b9;
+}
+
+.login-btn {
+    height: 48px;
+    font-weight: 500;
+    font-size: 1rem;
+    transition: all 0.3s ease;
+}
+
+.login-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.toggle-password {
+    height: 48px;
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+}
+
+.forgot-password {
+    color: var(--secondary-color);
+    text-decoration: none;
+}
+
+.forgot-password:hover {
+    text-decoration: underline;
+}
+
+.support-info {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.support-info a {
+    color: white;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.support-info a:hover {
+    text-decoration: underline;
+}
+
+.alert {
+    text-align: right;
+    direction: rtl;
+    margin-bottom: 1.5rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 576px) {
+    .card-header, .card-body, .card-footer {
+        padding: 1.5rem 1rem;
+    }
+}

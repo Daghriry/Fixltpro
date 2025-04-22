@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">إدارة المستخدمين</h2>
+
+<!-- زر إضافة مستخدم جديد -->
+<div class="mb-4">
+    <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addUserModal">
+        <i class="fas fa-user-plus me-1"></i>إضافة مستخدم جديد
+    </button>
+</div>
+
+<!-- قائمة المستخدمين -->
+<div class="card">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">المستخدمون المسجلون</h5>
+        <span class="badge bg-secondary">{{ users|length }} مستخدم</span>
+    </div>
+    <div class="card-body p-0">
+        {% if users %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">اسم المستخدم</th>
+                        <th scope="col">الاسم</th>
+                        <th scope="col">نوع المستخدم</th>
+                        <th scope="col">البلاغات المنشأة</th>
+                        <th scope="col">البلاغات المسندة</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <th scope="row">{{ user.id }}</th>
+                        <td>{{ user.username }}</td>
+                        <td>{{ user.name }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if user.user_type == 'admin' %}bg-danger
+                                {% elif user.user_type == 'maintenance' %}bg-success
+                                {% else %}bg-info{% endif %}">
+                                {% if user.user_type == 'admin' %}
+                                    مدير
+                                {% elif user.user_type == 'maintenance' %}
+                                    فني صيانة
+                                {% else %}
+                                    موظف
+                                {% endif %}
+                            </span>
+                        </td>
+                        <td>{{ user.tickets_created.count() }}</td>
+                        <td>{{ user.tickets_assigned.count() }}</td>
+                        <td>
+                            <button class="btn btn-sm btn-warning edit-user-btn" 
+                                    data-id="{{ user.id }}"
+                                    data-name="{{ user.name }}"
+                                    data-username="{{ user.username }}"
+                                    data-type="{{ user.user_type }}"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#editUserModal">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            {% if user.id != current_user.id %}
+                            <button class="btn btn-sm btn-danger delete-user-btn" 
+                                    data-id="{{ user.id }}"
+                                    data-name="{{ user.name }}"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#deleteUserModal">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <i class="fas fa-users fa-3x text-muted mb-3"></i>
+            <p class="lead">لا يوجد مستخدمين حالياً</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- تحديث نافذة إضافة مستخدم جديد -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-labelledby="addUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addUserModalLabel">إضافة مستخدم جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_add_user') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">الاسم</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="username" class="form-label">اسم المستخدم</label>
+                        <input type="text" class="form-control" id="username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">كلمة المرور</label>
+                        <input type="password" class="form-control" id="password" name="password" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="email" class="form-label">البريد الإلكتروني</label>
+                        <input type="email" class="form-control" id="email" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">رقم الهاتف</label>
+                        <input type="tel" class="form-control" id="phone" name="phone">
+                    </div>
+                    <div class="mb-3">
+                        <label for="user_type" class="form-label">نوع المستخدم</label>
+                        <select class="form-select" id="user_type" name="user_type" required>
+                            <option value="admin">مدير</option>
+                            <option value="maintenance">فني صيانة</option>
+                            <option value="employee">موظف</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-primary">إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- تحديث نافذة تعديل مستخدم -->
+<div class="modal fade" id="editUserModal" tabindex="-1" aria-labelledby="editUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="editUserModalLabel">تعديل مستخدم</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_edit_user') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_user_id" name="user_id">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">الاسم</label>
+                        <input type="text" class="form-control" id="edit_name" name="name" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_username" class="form-label">اسم المستخدم</label>
+                        <input type="text" class="form-control" id="edit_username" name="username" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_email" class="form-label">البريد الإلكتروني</label>
+                        <input type="email" class="form-control" id="edit_email" name="email">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_phone" class="form-label">رقم الهاتف</label>
+                        <input type="tel" class="form-control" id="edit_phone" name="phone">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_password" class="form-label">كلمة المرور (اتركها فارغة إذا لم ترغب في تغييرها)</label>
+                        <input type="password" class="form-control" id="edit_password" name="password">
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_user_type" class="form-label">نوع المستخدم</label>
+                        <select class="form-select" id="edit_user_type" name="user_type" required>
+                            <option value="admin">مدير</option>
+                            <option value="maintenance">فني صيانة</option>
+                            <option value="employee">موظف</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- تحديث نافذة حذف مستخدم -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-labelledby="deleteUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteUserModalLabel">حذف مستخدم</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_delete_user') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="delete_user_id" name="user_id">
+                    <p>هل أنت متأكد من حذف المستخدم <strong id="delete_user_name"></strong>؟</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        تحذير: سيتم إزالة كافة بيانات المستخدم من النظام بشكل نهائي.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">تأكيد الحذف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // تعبئة بيانات المستخدم في نافذة التعديل
+        const editButtons = document.querySelectorAll('.edit-user-btn');
+        editButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const userId = this.getAttribute('data-id');
+                const userName = this.getAttribute('data-name');
+                const username = this.getAttribute('data-username');
+                const userType = this.getAttribute('data-type');
+                
+                document.getElementById('edit_user_id').value = userId;
+                document.getElementById('edit_name').value = userName;
+                document.getElementById('edit_username').value = username;
+                document.getElementById('edit_user_type').value = userType;
+                document.getElementById('edit_password').value = '';
+            });
+        });
+        
+        // تعبئة بيانات المستخدم في نافذة الحذف
+        const deleteButtons = document.querySelectorAll('.delete-user-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const userId = this.getAttribute('data-id');
+                const userName = this.getAttribute('data-name');
+                
+                document.getElementById('delete_user_id').value = userId;
+                document.getElementById('delete_user_name').textContent = userName;
+            });
+        });
+    });
+</script>
+{% endblock %}

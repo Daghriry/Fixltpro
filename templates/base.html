@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="نظام بلاغات الدعم الفني - إدارة وتتبع المشكلات التقنية">
+    <meta name="author" content="Fixltpro">
+    <title>{% block title %}نظام بلاغات الدعم الفني{% endblock %}</title>
+    <!-- Bootstrap RTL -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <!-- Page-specific CSS -->
+    {% if request.endpoint == 'login' %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+    {% endif %}
+    {% block styles %}{% endblock %}
+    <!-- Favicon -->
+    <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
+</head>
+<body>
+    {% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}
+    <!-- شريط التنقل -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Fixltpro" width="30" height="30" class="d-inline-block align-text-top me-2">
+                نظام بلاغات الدعم الفني
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="تبديل التنقل">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% if session.user_id %}
+                        {% set current_user = get_current_user() %}
+                        {% if current_user.user_type == 'admin' %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}" href="{{ url_for('admin_dashboard') }}">
+                                    <i class="fas fa-tachometer-alt me-1"></i>لوحة التحكم
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'admin_users' %}active{% endif %}" href="{{ url_for('admin_users') }}">
+                                    <i class="fas fa-users me-1"></i>المستخدمين
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'admin_categories' %}active{% endif %}" href="{{ url_for('admin_categories') }}">
+                                    <i class="fas fa-tags me-1"></i>التصنيفات
+                                </a>
+                            </li>
+                        {% elif current_user.user_type == 'maintenance' %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'maintenance_dashboard' %}active{% endif %}" href="{{ url_for('maintenance_dashboard') }}">
+                                    <i class="fas fa-clipboard-list me-1"></i>بلاغاتي
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'maintenance_reports' %}active{% endif %}" href="{{ url_for('maintenance_reports') }}">
+                                    <i class="fas fa-chart-bar me-1"></i>التقارير
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'create_ticket' %}active{% endif %}" href="{{ url_for('create_ticket') }}">
+                                    <i class="fas fa-plus-circle me-1"></i>إنشاء بلاغ
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if request.endpoint == 'my_tickets' %}active{% endif %}" href="{{ url_for('my_tickets') }}">
+                                    <i class="fas fa-ticket-alt me-1"></i>بلاغاتي
+                                </a>
+                            </li>
+                        {% endif %}
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    {% if session.user_id %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user-circle me-1"></i>
+                                {% if get_current_user() %}
+                                    {{ get_current_user().name }}
+                                {% endif %}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('profile') }}">
+                                        <i class="fas fa-id-card me-2"></i>الملف الشخصي
+                                    </a>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item" href="{{ url_for('logout') }}">
+                                        <i class="fas fa-sign-out-alt me-2"></i>تسجيل الخروج
+                                    </a>
+                                </li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('login') }}">
+                                <i class="fas fa-sign-in-alt me-1"></i>تسجيل الدخول
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- رسائل التنبيه -->
+    <div class="container flash-messages mt-3">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+    </div>
+    {% endif %}
+    
+    <!-- المحتوى الرئيسي -->
+    <main class="{% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}container mt-4{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}
+    <!-- التذييل -->
+    <footer class="bg-light text-center text-muted py-3 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-3 mb-md-0">
+                    <h5 class="mb-3">نظام بلاغات الدعم الفني</h5>
+                    <p class="small">منصة متكاملة لإدارة وتتبع المشكلات التقنية داخل المؤسسة</p>
+                </div>
+                <div class="col-md-4 mb-3 mb-md-0">
+                    <h5 class="mb-3">روابط سريعة</h5>
+                    <ul class="list-unstyled small">
+                        <li><a href="{{ url_for('index') }}" class="text-muted text-decoration-none">الرئيسية</a></li>
+                        <li><a href="#" class="text-muted text-decoration-none">الدعم الفني</a></li>
+                        <li><a href="#" class="text-muted text-decoration-none">سياسة الخصوصية</a></li>
+                    </ul>
+                </div>
+                <div class="col-md-4">
+                    <h5 class="mb-3">تواصل معنا</h5>
+                    <ul class="list-unstyled small">
+                        <li><i class="fas fa-envelope me-2"></i><a href="mailto:Su2da2@gmail.com" class="text-muted text-decoration-none">Su2da2@gmail.com</a></li>
+                        <li><i class="fas fa-phone me-2"></i><a href="tel:+966557364973" class="text-muted text-decoration-none">+966 55 736 4973</a></li>
+                    </ul>
+                </div>
+            </div>
+            <hr>
+            <p class="mb-0 small">جميع الحقوق محفوظة &copy; <span id="current-year"></span> نظام بلاغات الدعم الفني</p>
+        </div>
+    </footer>
+    {% endif %}
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // تعيين التاريخ الحالي في التذييل
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            const currentYearElement = document.getElementById('current-year');
+            if (currentYearElement) {
+                currentYearElement.textContent = now.getFullYear();
+            }
+            
+            // إضافة تأثير نشط للروابط في القائمة
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    link.classList.add('active');
+                }
+            });
+        });
+    </script>
+    <!-- Page-specific JavaScript -->
+    {% if request.endpoint == 'login' %}
+    <script src="{{ url_for('static', filename='js/login.js') }}"></script>
+    {% endif %}
+    {% block scripts %}{% endblock %}
+</body>
+</html>

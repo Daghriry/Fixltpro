@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}الملف الشخصي - {{ user.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row">
+        <!-- معلومات المستخدم -->
+        <div class="col-lg-4">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">معلومات المستخدم</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="mt-3 mb-4">
+                        <img src="{{ url_for('static', filename='images/avatar.png') }}" alt="{{ user.name }}" class="rounded-circle img-fluid" style="width: 150px;">
+                    </div>
+                    <h4 class="mb-1">{{ user.name }}</h4>
+                    <p class="text-muted mb-3">
+                        {% if user.user_type == 'admin' %}
+                        <span class="badge bg-danger">مدير النظام</span>
+                        {% elif user.user_type == 'maintenance' %}
+                        <span class="badge bg-warning text-dark">فني صيانة</span>
+                        {% else %}
+                        <span class="badge bg-info">موظف</span>
+                        {% endif %}
+                    </p>
+                    <div class="d-flex justify-content-center">
+                        {% if user.email %}
+                        <div class="px-3">
+                            <p class="mb-1 text-muted small">البريد الإلكتروني</p>
+                            <p class="mb-0 text-primary">{{ user.email }}</p>
+                        </div>
+                        {% endif %}
+                        {% if user.phone %}
+                        <div class="px-3">
+                            <p class="mb-1 text-muted small">رقم الهاتف</p>
+                            <p class="mb-0 text-primary">{{ user.phone }}</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- الإحصائيات -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">الإحصائيات</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% if user.user_type == 'employee' %}
+                            <div class="col-sm-4 text-center">
+                                <h5 class="mb-0">{{ stats.created_tickets }}</h5>
+                                <div class="small text-muted">بلاغاتي</div>
+                            </div>
+                            <div class="col-sm-4 text-center">
+                                <h5 class="mb-0">{{ stats.active_tickets }}</h5>
+                                <div class="small text-muted">مفتوحة</div>
+                            </div>
+                            <div class="col-sm-4 text-center">
+                                <h5 class="mb-0">{{ stats.resolved_tickets }}</h5>
+                                <div class="small text-muted">مكتملة</div>
+                            </div>
+                        {% elif user.user_type == 'maintenance' %}
+                            <div class="col-6 col-sm-3 text-center mb-3">
+                                <h5 class="mb-0">{{ stats.assigned_tickets }}</h5>
+                                <div class="small text-muted">مسندة</div>
+                            </div>
+                            <div class="col-6 col-sm-3 text-center mb-3">
+                                <h5 class="mb-0">{{ stats.active_tickets }}</h5>
+                                <div class="small text-muted">مفتوحة</div>
+                            </div>
+                            <div class="col-6 col-sm-3 text-center">
+                                <h5 class="mb-0">{{ stats.resolved_tickets }}</h5>
+                                <div class="small text-muted">مكتملة</div>
+                            </div>
+                            <div class="col-6 col-sm-3 text-center">
+                                <h5 class="mb-0">{{ stats.overdue_tickets }}</h5>
+                                <div class="small text-muted">متأخرة</div>
+                            </div>
+                        {% elif user.user_type == 'admin' %}
+                            <div class="col-6 col-sm-3 text-center mb-3">
+                                <h5 class="mb-0">{{ stats.total_tickets }}</h5>
+                                <div class="small text-muted">البلاغات</div>
+                            </div>
+                            <div class="col-6 col-sm-3 text-center mb-3">
+                                <h5 class="mb-0">{{ stats.active_tickets }}</h5>
+                                <div class="small text-muted">مفتوحة</div>
+                            </div>
+                            <div class="col-6 col-sm-3 text-center">
+                                <h5 class="mb-0">{{ stats.users_count }}</h5>
+                                <div class="small text-muted">المستخدمين</div>
+                            </div>
+                            <div class="col-6 col-sm-3 text-center">
+                                <h5 class="mb-0">{{ stats.categories_count }}</h5>
+                                <div class="small text-muted">التصنيفات</div>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- تحديث المعلومات -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">تعديل الملف الشخصي</h5>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST" action="{{ url_for('profile') }}" id="profileForm">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="username" class="form-label">اسم المستخدم</label>
+                                <input type="text" class="form-control" id="username" name="username" value="{{ user.username }}" disabled>
+                                <div class="form-text">لا يمكن تغيير اسم المستخدم.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="name" class="form-label">الاسم الكامل</label>
+                                <input type="text" class="form-control" id="name" name="name" value="{{ user.name }}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="email" class="form-label">البريد الإلكتروني</label>
+                                <input type="email" class="form-control" id="email" name="email" value="{{ user.email or '' }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="phone" class="form-label">رقم الهاتف</label>
+                                <input type="tel" class="form-control" id="phone" name="phone" value="{{ user.phone or '' }}">
+                            </div>
+                        </div>
+                        
+                        <hr class="my-4">
+                        <h5 class="mb-3">تغيير كلمة المرور</h5>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <label for="current_password" class="form-label">كلمة المرور الحالية</label>
+                                <input type="password" class="form-control" id="current_password" name="current_password">
+                                <div class="form-text">أدخل كلمة المرور الحالية فقط إذا كنت ترغب في تغييرها.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label for="new_password" class="form-label">كلمة المرور الجديدة</label>
+                                <input type="password" class="form-control" id="new_password" name="new_password">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="confirm_password" class="form-label">تأكيد كلمة المرور</label>
+                                <input type="password" class="form-control" id="confirm_password" name="confirm_password">
+                            </div>
+                        </div>
+                        
+                        <div class="text-end mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i>حفظ التغييرات
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const profileForm = document.getElementById('profileForm');
+    const currentPasswordInput = document.getElementById('current_password');
+    const newPasswordInput = document.getElementById('new_password');
+    const confirmPasswordInput = document.getElementById('confirm_password');
+    
+    if (profileForm) {
+        profileForm.addEventListener('submit', function(event) {
+            // التحقق من تطابق كلمات المرور في حالة إدخال كلمة مرور جديدة
+            if (currentPasswordInput.value && newPasswordInput.value !== confirmPasswordInput.value) {
+                event.preventDefault();
+                alert('كلمات المرور غير متطابقة');
+                confirmPasswordInput.focus();
+                return false;
+            }
+            
+            // التحقق من إدخال كلمة المرور الحالية إذا تم إدخال كلمة مرور جديدة
+            if ((newPasswordInput.value || confirmPasswordInput.value) && !currentPasswordInput.value) {
+                event.preventDefault();
+                alert('يرجى إدخال كلمة المرور الحالية للتحقق');
+                currentPasswordInput.focus();
+                return false;
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

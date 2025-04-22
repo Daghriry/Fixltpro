@@ -1,0 +1,328 @@
+{% extends "base.html" %}
+
+{% block title %}تقارير فني الصيانة{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">تقارير فني الصيانة</h2>
+
+<!-- بطاقات الإحصائيات -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">إجمالي البلاغات</h6>
+                        <h2 class="mb-0">{{ total_assigned }}</h2>
+                    </div>
+                    <i class="fas fa-ticket-alt fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">معدل الإكمال</h6>
+                        <h2 class="mb-0">{{ completion_rate }}%</h2>
+                    </div>
+                    <i class="fas fa-chart-line fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">متوسط وقت الاستجابة</h6>
+                        <h2 class="mb-0">{{ avg_response_time }}</h2>
+                        <small>ساعة</small>
+                    </div>
+                    <i class="fas fa-clock fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">البلاغات المتأخرة</h6>
+                        <h2 class="mb-0">{{ overdue_count }}</h2>
+                    </div>
+                    <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- الرسوم البيانية -->
+<div class="row mb-4">
+    <!-- الرسم البياني للبلاغات حسب الأولوية -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-1"></i>البلاغات حسب الأولوية</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="priorityChart" height="240"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- الرسم البياني للبلاغات حسب القسم -->
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-1"></i>البلاغات حسب التصنيف</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="240"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- توزيع البلاغات -->
+<div class="row mb-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-th me-1"></i>توزيع البلاغات المسندة</h5>
+            </div>
+            <div class="card-body">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <div class="mb-2">
+                            <span class="badge bg-danger rounded-pill p-2 px-3 fs-6">{{ new_count }}</span>
+                        </div>
+                        <h6>جديدة</h6>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-2">
+                            <span class="badge bg-warning text-dark rounded-pill p-2 px-3 fs-6">{{ in_progress_count }}</span>
+                        </div>
+                        <h6>قيد المعالجة</h6>
+                    </div>
+                    <div class="col-4">
+                        <div class="mb-2">
+                            <span class="badge bg-success rounded-pill p-2 px-3 fs-6">{{ completed_count }}</span>
+                        </div>
+                        <h6>مكتملة</h6>
+                    </div>
+                </div>
+                
+                <!-- استخدام سمات data- لتمرير البيانات إلى JavaScript -->
+                <div class="progress mt-4" style="height: 25px;" 
+                    data-total="{{ total_assigned }}"
+                    data-new="{{ new_count }}"
+                    data-in-progress="{{ in_progress_count }}"
+                    data-completed="{{ completed_count }}">
+                    {% if total_assigned > 0 %}
+                        <div class="progress-bar bg-danger" role="progressbar" id="new-progress-bar">
+                            {% if new_count > 0 %}{{ new_count }}{% endif %}
+                        </div>
+                        <div class="progress-bar bg-warning" role="progressbar" id="in-progress-bar">
+                            {% if in_progress_count > 0 %}{{ in_progress_count }}{% endif %}
+                        </div>
+                        <div class="progress-bar bg-success" role="progressbar" id="completed-progress-bar">
+                            {% if completed_count > 0 %}{{ completed_count }}{% endif %}
+                        </div>
+                    {% else %}
+                        <div class="progress-bar" role="progressbar" style="width: 100%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            لا توجد بلاغات
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- أحدث البلاغات المكتملة -->
+<div class="card">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>أحدث البلاغات المكتملة</h5>
+    </div>
+    <div class="card-body p-0">
+        {% if recent_completed %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">القسم</th>
+                        <th scope="col">الأولوية</th>
+                        <th scope="col">تاريخ الإنشاء</th>
+                        <th scope="col">تاريخ الإكمال</th>
+                        <th scope="col">مدة المعالجة</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in recent_completed %}
+                    <tr>
+                        <th scope="row">{{ ticket.id }}</th>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name }}</td>
+                        <td>
+                            <span class="badge" {% if ticket.priority.color %}style="background-color: {{ ticket.priority.color }};"{% endif %}>
+                                {{ ticket.priority.name }}
+                            </span>
+                        </td>
+                        <td>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>{{ ticket.updated_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            {% set duration = (ticket.updated_at - ticket.created_at).total_seconds() / 3600 %}
+                            {{ '%0.1f'|format(duration) }} ساعة
+                        </td>
+                        <td>
+                            <a href="{{ url_for('view_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye me-1"></i>عرض
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <p class="mb-0">لا توجد بلاغات مكتملة</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- تمرير البيانات كـ JSON strings -->
+<div id="priority-data" style="display: none;">
+[
+    {% for p in priority_stats_raw %}
+    {"name": "{{ p.name }}", "count": {{ p.count }}, "color": "{{ p.color }}"}{% if not loop.last %},{% endif %}
+    {% endfor %}
+]
+</div>
+
+<div id="category-data" style="display: none;">
+[
+    {% for c in category_stats_raw %}
+    {"name": "{{ c.name }}", "count": {{ c.count }}}{% if not loop.last %},{% endif %}
+    {% endfor %}
+]
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    // تعيين عرض شرائط التقدم
+    const progressContainer = document.querySelector('.progress');
+    const totalAssigned = parseInt(progressContainer.getAttribute('data-total') || 0);
+    
+    if (totalAssigned > 0) {
+        const newCount = parseInt(progressContainer.getAttribute('data-new') || 0);
+        const inProgressCount = parseInt(progressContainer.getAttribute('data-in-progress') || 0);
+        const completedCount = parseInt(progressContainer.getAttribute('data-completed') || 0);
+        
+        const newPercent = Math.round((newCount / totalAssigned) * 100);
+        const inProgressPercent = Math.round((inProgressCount / totalAssigned) * 100);
+        const completedPercent = Math.round((completedCount / totalAssigned) * 100);
+        
+        // تعيين عرض شرائط التقدم
+        document.getElementById('new-progress-bar').style.width = newPercent + '%';
+        document.getElementById('in-progress-bar').style.width = inProgressPercent + '%';
+        document.getElementById('completed-progress-bar').style.width = completedPercent + '%';
+    }
+    
+    // قراءة بيانات الرسوم البيانية من العناصر المخفية
+    let priorityStats = [];
+    let categoryStats = [];
+    
+    try {
+        const priorityDataElement = document.getElementById('priority-data');
+        if (priorityDataElement) {
+            priorityStats = JSON.parse(priorityDataElement.textContent || '[]');
+        }
+    } catch (e) {
+        console.error('خطأ في تحليل بيانات الأولويات:', e);
+    }
+    
+    try {
+        const categoryDataElement = document.getElementById('category-data');
+        if (categoryDataElement) {
+            categoryStats = JSON.parse(categoryDataElement.textContent || '[]');
+        }
+    } catch (e) {
+        console.error('خطأ في تحليل بيانات التصنيفات:', e);
+    }
+    
+    // رسم مخطط الأولويات
+    const priorityChart = document.getElementById('priorityChart');
+    if (priorityChart && priorityStats && priorityStats.length > 0) {
+        const priorityNames = priorityStats.map(function(item) { return item.name; });
+        const priorityCounts = priorityStats.map(function(item) { return item.count; });
+        const priorityColors = priorityStats.map(function(item) { return item.color; });
+        
+        new Chart(priorityChart, {
+            type: 'pie',
+            data: {
+                labels: priorityNames,
+                datasets: [{
+                    data: priorityCounts,
+                    backgroundColor: priorityColors
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+    
+    // رسم مخطط الأقسام
+    const categoryChart = document.getElementById('categoryChart');
+    if (categoryChart && categoryStats && categoryStats.length > 0) {
+        const categoryNames = categoryStats.map(function(item) { return item.name; });
+        const categoryCounts = categoryStats.map(function(item) { return item.count; });
+        
+        new Chart(categoryChart, {
+            type: 'pie',
+            data: {
+                labels: categoryNames,
+                datasets: [{
+                    data: categoryCounts,
+                    backgroundColor: [
+                        '#4e73df', '#1cc88a', '#36b9cc', '#f6c23e', 
+                        '#e74a3b', '#5a5c69', '#fd7e14', '#20c997'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

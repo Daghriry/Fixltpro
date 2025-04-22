@@ -1,0 +1,286 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">إدارة التصنيفات</h2>
+
+<!-- روابط الصفحات الإدارية -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group w-100">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">
+                <i class="fas fa-tachometer-alt me-1"></i>لوحة التحكم
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                <i class="fas fa-users me-1"></i>إدارة المستخدمين
+            </a>
+            <a href="{{ url_for('admin_categories') }}" class="btn btn-primary active">
+                <i class="fas fa-tags me-1"></i>إدارة التصنيفات
+            </a>
+            <a href="{{ url_for('admin_report') }}" class="btn btn-primary">
+                <i class="fas fa-chart-bar me-1"></i>تقارير
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- قائمة التصنيفات -->
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">التصنيفات الحالية</h5>
+                <span class="badge bg-secondary">{{ categories|length }} تصنيف</span>
+            </div>
+            <div class="card-body p-0">
+                {% if categories %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">#</th>
+                                <th scope="col">اسم التصنيف</th>
+                                <th scope="col">عدد البلاغات</th>
+                                <th scope="col">الإجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for category in categories %}
+                            <tr>
+                                <th scope="row">{{ category.id }}</th>
+                                <td>{{ category.name }}</td>
+                                <td>{{ category.tickets.count() }}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning edit-category-btn" 
+                                            data-id="{{ category.id }}"
+                                            data-name="{{ category.name }}"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#editCategoryModal">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger delete-category-btn" 
+                                            data-id="{{ category.id }}"
+                                            data-name="{{ category.name }}"
+                                            data-tickets="{{ category.tickets.count() }}"
+                                            data-bs-toggle="modal" 
+                                            data-bs-target="#deleteCategoryModal">
+                                        <i class="fas fa-trash-alt"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center p-4">
+                    <i class="fas fa-tag fa-3x text-muted mb-3"></i>
+                    <p class="lead">لا توجد تصنيفات حالياً</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- إضافة تصنيف جديد -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0"><i class="fas fa-plus-circle me-1"></i>إضافة تصنيف جديد</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('admin_add_category') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">اسم التصنيف</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-plus me-1"></i>إضافة
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- إحصائيات التصنيفات -->
+        <div class="card mt-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-1"></i>إحصائيات التصنيفات</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoriesChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- تحديث نافذة تعديل التصنيف -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="editCategoryModalLabel">تعديل التصنيف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_edit_category') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_category_id" name="category_id">
+                    <div class="mb-3">
+                        <label for="edit_category_name" class="form-label">اسم التصنيف</label>
+                        <input type="text" class="form-control" id="edit_category_name" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- تحديث نافذة حذف التصنيف -->
+<div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-labelledby="deleteCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteCategoryModalLabel">حذف التصنيف</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_delete_category') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="delete_category_id" name="category_id">
+                    <p>هل أنت متأكد من حذف التصنيف <strong id="delete_category_name"></strong>؟</p>
+                    <div id="category_has_tickets_warning" class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        تحذير: هذا التصنيف يحتوي على <strong id="tickets_count"></strong> بلاغ. يجب نقل هذه البلاغات إلى تصنيف آخر قبل الحذف.
+                    </div>
+                    <div id="category_replacement" class="mb-3">
+                        <label for="replacement_category_id" class="form-label">نقل البلاغات إلى:</label>
+                        <select class="form-select" id="replacement_category_id" name="replacement_category_id" required>
+                            <option value="" selected disabled>-- اختر تصنيف بديل --</option>
+                            {% for category in categories %}
+                            <option value="{{ category.id }}">{{ category.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">تأكيد الحذف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // تعبئة بيانات التصنيف في نافذة التعديل
+    const editButtons = document.querySelectorAll('.edit-category-btn');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const categoryId = this.getAttribute('data-id');
+            const categoryName = this.getAttribute('data-name');
+            
+            document.getElementById('edit_category_id').value = categoryId;
+            document.getElementById('edit_category_name').value = categoryName;
+        });
+    });
+    
+    // تعبئة بيانات التصنيف في نافذة الحذف
+    // تعبئة بيانات التصنيف في نافذة الحذف
+    const deleteButtons = document.querySelectorAll('.delete-category-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const categoryId = this.getAttribute('data-id');
+            const categoryName = this.getAttribute('data-name');
+            const ticketsCount = parseInt(this.getAttribute('data-tickets'));
+            
+            document.getElementById('delete_category_id').value = categoryId;
+            document.getElementById('delete_category_name').textContent = categoryName;
+            
+            // إظهار/إخفاء خيارات نقل البلاغات بناءً على عدد البلاغات
+            const warningDiv = document.getElementById('category_has_tickets_warning');
+            const replacementDiv = document.getElementById('category_replacement');
+            const ticketsCountSpan = document.getElementById('tickets_count');
+            const replacementSelect = document.getElementById('replacement_category_id');
+            
+            if (ticketsCount > 0) {
+                warningDiv.style.display = 'block';
+                replacementDiv.style.display = 'block';
+                ticketsCountSpan.textContent = ticketsCount;
+                replacementSelect.setAttribute('required', 'required'); // إضافة خاصية required
+                
+                // استثناء التصنيف الحالي من قائمة التصنيفات البديلة
+                for (let i = 0; i < replacementSelect.options.length; i++) {
+                    if (replacementSelect.options[i].value === categoryId) {
+                        replacementSelect.options[i].disabled = true;
+                    } else {
+                        replacementSelect.options[i].disabled = false;
+                    }
+                }
+            } else {
+                warningDiv.style.display = 'none';
+                replacementDiv.style.display = 'none';
+                replacementSelect.removeAttribute('required'); // إزالة خاصية required
+            }
+        });
+    });
+    
+    // رسم مخطط التصنيفات باستخدام البيانات
+    const categoriesChart = document.getElementById('categoriesChart');
+    
+    // تحويل سلسلة JSON إلى كائن JavaScript
+    const categoryData = JSON.parse('{{ categories_json|safe }}');
+    
+    if (categoriesChart && categoryData && categoryData.length > 0) {
+        // استخراج الأسماء وعدد البلاغات
+        const categoryNames = [];
+        const categoryTicketCounts = [];
+        
+        // استخدام حلقة for بدلاً من map لتجنب أخطاء JavaScript
+        for (let i = 0; i < categoryData.length; i++) {
+            categoryNames.push(categoryData[i].name);
+            categoryTicketCounts.push(categoryData[i].tickets_count);
+        }
+        
+        new Chart(categoriesChart, {
+            type: 'pie',
+            data: {
+                labels: categoryNames,
+                datasets: [{
+                    data: categoryTicketCounts,
+                    backgroundColor: [
+                        '#4e73df',
+                        '#1cc88a',
+                        '#36b9cc',
+                        '#f6c23e',
+                        '#e74a3b',
+                        '#5a5c69',
+                        '#fd7e14',
+                        '#20c997',
+                        '#6f42c1',
+                        '#17a2b8'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

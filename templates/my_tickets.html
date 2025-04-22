@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+
+{% block title %}بلاغاتي{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">بلاغاتي</h2>
+
+<!-- بطاقات الإحصائيات -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">إجمالي البلاغات</h6>
+                        <h2 class="mb-0">{{ total_tickets }}</h2>
+                    </div>
+                    <i class="fas fa-clipboard-list fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">قيد المعالجة</h6>
+                        <h2 class="mb-0">{{ in_progress_tickets|length }}</h2>
+                    </div>
+                    <i class="fas fa-clock fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">مكتملة</h6>
+                        <h2 class="mb-0">{{ completed_tickets|length }}</h2>
+                    </div>
+                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- زر إنشاء بلاغ جديد -->
+<div class="mb-4">
+    <a href="{{ url_for('create_ticket') }}" class="btn btn-primary">
+        <i class="fas fa-plus-circle me-1"></i>إنشاء بلاغ جديد
+    </a>
+</div>
+
+<!-- البلاغات المفتوحة/الجديدة -->
+<div class="card mb-4">
+    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>البلاغات الجديدة</h5>
+        <span class="badge bg-light text-danger">{{ open_tickets|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if open_tickets %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">القسم</th>
+                        <th scope="col">الأولوية</th>
+                        <th scope="col">تاريخ الإنشاء</th>
+                        <th scope="col">الحالة</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in open_tickets %}
+                    <tr>
+                        <th scope="row">{{ ticket.id }}</th>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name }}</td>
+                        <td>
+                            <span class="badge priority-badge" 
+                                  {% if ticket.priority.color %}style="background-color: {{ ticket.priority.color }};"{% endif %}>
+                                {{ ticket.priority.name }}
+                            </span>
+                        </td>
+                        <td>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            <span class="badge bg-danger">
+                                {{ ticket.status.name }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('view_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye me-1"></i>عرض
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <p class="mb-0">لا توجد بلاغات جديدة</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- البلاغات قيد المعالجة -->
+<div class="card mb-4">
+    <div class="card-header bg-warning text-dark d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-tools me-2"></i>البلاغات قيد المعالجة</h5>
+        <span class="badge bg-light text-warning">{{ in_progress_tickets|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if in_progress_tickets %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">القسم</th>
+                        <th scope="col">الأولوية</th>
+                        <th scope="col">تاريخ الإنشاء</th>
+                        <th scope="col">فني الصيانة</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in in_progress_tickets %}
+                    <tr>
+                        <th scope="row">{{ ticket.id }}</th>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name }}</td>
+                        <td>
+                            <span class="badge priority-badge" 
+                                  {% if ticket.priority.color %}style="background-color: {{ ticket.priority.color }};"{% endif %}>
+                                {{ ticket.priority.name }}
+                            </span>
+                        </td>
+                        <td>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            {% if ticket.assignee %}
+                                {{ ticket.assignee.name }}
+                            {% else %}
+                                <span class="text-muted">غير معين</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{{ url_for('view_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye me-1"></i>عرض
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <p class="mb-0">لا توجد بلاغات قيد المعالجة</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- البلاغات المكتملة -->
+<div class="card">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>البلاغات المكتملة</h5>
+        <span class="badge bg-light text-success">{{ completed_tickets|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if completed_tickets %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">القسم</th>
+                        <th scope="col">الأولوية</th>
+                        <th scope="col">تاريخ الإنشاء</th>
+                        <th scope="col">تاريخ الإكمال</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in completed_tickets %}
+                    <tr>
+                        <th scope="row">{{ ticket.id }}</th>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name }}</td>
+                        <td>
+                            <span class="badge priority-badge" 
+                                  {% if ticket.priority.color %}style="background-color: {{ ticket.priority.color }};"{% endif %}>
+                                {{ ticket.priority.name }}
+                            </span>
+                        </td>
+                        <td>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>{{ ticket.updated_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            <a href="{{ url_for('view_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye me-1"></i>عرض
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <p class="mb-0">لا توجد بلاغات مكتملة</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

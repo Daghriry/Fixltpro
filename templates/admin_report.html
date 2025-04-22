@@ -1,0 +1,372 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">تقارير النظام</h2>
+
+<!-- روابط الصفحات الإدارية -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group w-100">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">
+                <i class="fas fa-tachometer-alt me-1"></i>لوحة التحكم
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                <i class="fas fa-users me-1"></i>إدارة المستخدمين
+            </a>
+            <a href="{{ url_for('admin_categories') }}" class="btn btn-primary">
+                <i class="fas fa-tags me-1"></i>إدارة التصنيفات
+            </a>
+            <a href="{{ url_for('admin_report') }}" class="btn btn-primary active">
+                <i class="fas fa-chart-bar me-1"></i>تقارير
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- مرشحات التقارير -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0"><i class="fas fa-filter me-1"></i>تصفية التقارير</h5>
+    </div>
+    <div class="card-body">
+        <form id="reportFilterForm" action="{{ url_for('admin_report') }}" method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label for="date_range" class="form-label">الفترة الزمنية</label>
+                <select class="form-select auto-submit" id="date_range" name="date_range">
+                    <option value="7" {% if date_range == 7 %}selected{% endif %}>آخر 7 أيام</option>
+                    <option value="30" {% if date_range == 30 %}selected{% endif %}>آخر 30 يوم</option>
+                    <option value="90" {% if date_range == 90 %}selected{% endif %}>آخر 3 أشهر</option>
+                    <option value="180" {% if date_range == 180 %}selected{% endif %}>آخر 6 أشهر</option>
+                    <option value="365" {% if date_range == 365 %}selected{% endif %}>آخر سنة</option>
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="report_category" class="form-label">التصنيف</label>
+                <select class="form-select auto-submit" id="report_category" name="category">
+                    <option value="">كل التصنيفات</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if selected_category == category.id %}selected{% endif %}>{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="report_user" class="form-label">المستخدم</label>
+                <select class="form-select auto-submit" id="report_user" name="user">
+                    <option value="">كل المستخدمين</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {% if selected_user == user.id %}selected{% endif %}>{{ user.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-3">
+                <label for="report_priority" class="form-label">الأولوية</label>
+                <select class="form-select auto-submit" id="report_priority" name="priority">
+                    <option value="">كل الأولويات</option>
+                    {% for priority in priorities %}
+                    <option value="{{ priority.id }}" {% if selected_priority == priority.id %}selected{% endif %}>{{ priority.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ملخص التقرير -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">إجمالي البلاغات</h6>
+                        <h2 class="mb-0">{{ report_data.total_tickets }}</h2>
+                    </div>
+                    <i class="fas fa-ticket-alt fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">البلاغات المكتملة</h6>
+                        <h2 class="mb-0">{{ report_data.completed_tickets }}</h2>
+                        <small>{{ report_data.completion_rate }}% معدل الإكمال</small>
+                    </div>
+                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">متوسط وقت الاستجابة</h6>
+                        <h2 class="mb-0">{{ report_data.avg_response_time }}</h2>
+                        <small>ساعة</small>
+                    </div>
+                    <i class="fas fa-clock fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-danger text-white h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">البلاغات المتأخرة</h6>
+                        <h2 class="mb-0">{{ report_data.overdue_tickets }}</h2>
+                        <small>{{ report_data.overdue_rate }}% من المفتوحة</small>
+                    </div>
+                    <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- الرسوم البيانية -->
+<div class="row">
+    <!-- إحصائيات البلاغات حسب الحالة -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-1"></i>البلاغات حسب الحالة</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart" height="240"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- إحصائيات البلاغات حسب التصنيف -->
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-1"></i>البلاغات حسب التصنيف</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="categoryChart" height="240"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- البلاغات المنشأة خلال الفترة -->
+    <div class="col-md-12 mb-4">
+        <div class="card">
+            <div class="card-header bg-light">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-1"></i>البلاغات المنشأة خلال الفترة</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="timelineChart" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- أداء فنيي الصيانة -->
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="fas fa-users-cog me-1"></i>أداء فنيي الصيانة</h5>
+                <button class="btn btn-sm btn-primary" id="print-report-btn">
+                    <i class="fas fa-print me-1"></i>طباعة التقرير
+                </button>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th scope="col">الفني</th>
+                                <th scope="col" class="text-center">البلاغات المسندة</th>
+                                <th scope="col" class="text-center">البلاغات المكتملة</th>
+                                <th scope="col" class="text-center">معدل الإكمال</th>
+                                <th scope="col" class="text-center">متوسط وقت الاستجابة</th>
+                                <th scope="col" class="text-center">البلاغات المتأخرة</th>
+                                <th scope="col" class="text-center">تقييم الأداء</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for tech in report_data.technicians %}
+                            <tr>
+                                <td>{{ tech.name }}</td>
+                                <td class="text-center">{{ tech.assigned }}</td>
+                                <td class="text-center">{{ tech.completed }}</td>
+                                <td class="text-center">
+                                    <div class="progress">
+                                        <div class="progress-bar bg-success progress-width" 
+                                            data-width="{{ tech.completion_rate }}"
+                                            role="progressbar">{{ tech.completion_rate }}%</div>
+                                    </div>
+                                </td>
+                                <td class="text-center">{{ tech.avg_response_time }} ساعة</td>
+                                <td class="text-center">{{ tech.overdue }}</td>
+                                <td class="text-center">
+                                    {% if tech.performance_rating >= 4.5 %}
+                                        <span class="badge bg-success">ممتاز</span>
+                                    {% elif tech.performance_rating >= 3.5 %}
+                                        <span class="badge bg-primary">جيد جداً</span>
+                                    {% elif tech.performance_rating >= 2.5 %}
+                                        <span class="badge bg-info">جيد</span>
+                                    {% elif tech.performance_rating >= 1.5 %}
+                                        <span class="badge bg-warning text-dark">مقبول</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">يحتاج تحسين</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    // إرسال النموذج تلقائيًا عند تغيير أي من حقول التصفية
+    const autoSubmitFields = document.querySelectorAll('.auto-submit');
+    autoSubmitFields.forEach(field => {
+        field.addEventListener('change', function() {
+            document.getElementById('reportFilterForm').submit();
+        });
+    });
+    
+    // تطبيق عرض شريط التقدم
+    document.querySelectorAll('.progress-width').forEach(bar => {
+        const width = bar.getAttribute('data-width');
+        if (width) {
+            bar.style.width = width + '%';
+        }
+    });
+    
+    // بيانات التقارير من الخادم
+    const reportData = {
+        status_names: JSON.parse('{{ report_data.status_names|tojson|safe }}'),
+        status_counts: JSON.parse('{{ report_data.status_counts|tojson|safe }}'),
+        category_names: JSON.parse('{{ report_data.category_names|tojson|safe }}'),
+        category_counts: JSON.parse('{{ report_data.category_counts|tojson|safe }}'),
+        timeline_labels: JSON.parse('{{ report_data.timeline_labels|tojson|safe }}'),
+        timeline_counts: JSON.parse('{{ report_data.timeline_counts|tojson|safe }}')
+    };
+    
+    // رسم مخطط الحالات
+    const statusChart = document.getElementById('statusChart');
+    if (statusChart && reportData && reportData.status_names && reportData.status_counts) {
+        new Chart(statusChart, {
+            type: 'pie',
+            data: {
+                labels: reportData.status_names,
+                datasets: [{
+                    data: reportData.status_counts,
+                    backgroundColor: [
+                        '#e74a3b',    // جديد - أحمر
+                        '#f6c23e',    // قيد المعالجة - أصفر
+                        '#1cc88a',    // مكتمل - أخضر
+                        '#6c757d'     // مغلق - رمادي
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+    
+    // رسم مخطط التصنيفات
+    const categoryChart = document.getElementById('categoryChart');
+    if (categoryChart && reportData && reportData.category_names && reportData.category_counts) {
+        new Chart(categoryChart, {
+            type: 'pie',
+            data: {
+                labels: reportData.category_names,
+                datasets: [{
+                    data: reportData.category_counts,
+                    backgroundColor: [
+                        '#4e73df',
+                        '#1cc88a',
+                        '#36b9cc',
+                        '#f6c23e',
+                        '#e74a3b',
+                        '#5a5c69',
+                        '#fd7e14',
+                        '#20c997',
+                        '#6f42c1',
+                        '#17a2b8'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    }
+                }
+            }
+        });
+    }
+    
+    // رسم مخطط الجدول الزمني
+    const timelineChart = document.getElementById('timelineChart');
+    if (timelineChart && reportData && reportData.timeline_labels && reportData.timeline_counts) {
+        new Chart(timelineChart, {
+            type: 'line',
+            data: {
+                labels: reportData.timeline_labels,
+                datasets: [{
+                    label: 'البلاغات المنشأة',
+                    data: reportData.timeline_counts,
+                    borderColor: '#4e73df',
+                    backgroundColor: 'rgba(78, 115, 223, 0.1)',
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+    
+    // طباعة التقرير
+    document.getElementById('print-report-btn').addEventListener('click', function() {
+        window.print();
+    });
+});
+</script>
+{% endblock %}

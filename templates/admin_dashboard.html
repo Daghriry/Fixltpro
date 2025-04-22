@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2 class="mb-4">لوحة تحكم الإدارة</h2>
+
+<!-- بطاقات الإحصائيات -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">إجمالي البلاغات</h6>
+                        <h2 class="mb-0">{{ total_tickets }}</h2>
+                    </div>
+                    <i class="fas fa-ticket-alt fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-dark">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">البلاغات المفتوحة</h6>
+                        <h2 class="mb-0">{{ open_tickets }}</h2>
+                    </div>
+                    <i class="fas fa-clock fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-danger text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">أولوية عالية</h6>
+                        <h2 class="mb-0">{{ high_priority }}</h2>
+                    </div>
+                    <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="card-title">مكتملة</h6>
+                        <h2 class="mb-0">{{ completed_tickets }}</h2>
+                    </div>
+                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- روابط الصفحات الإدارية -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="btn-group w-100">
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary active">
+                <i class="fas fa-tachometer-alt me-1"></i>لوحة التحكم
+            </a>
+            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
+                <i class="fas fa-users me-1"></i>إدارة المستخدمين
+            </a>
+            <a href="{{ url_for('admin_categories') }}" class="btn btn-primary">
+                <i class="fas fa-tags me-1"></i>إدارة التصنيفات
+            </a>
+            <a href="{{ url_for('admin_report') }}" class="btn btn-primary">
+                <i class="fas fa-chart-bar me-1"></i>تقارير
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- تصفية البلاغات -->
+<div class="card mb-4">
+    <div class="card-header bg-light">
+        <h5 class="mb-0">تصفية البلاغات</h5>
+    </div>
+    <div class="card-body">
+        <form id="filterForm" action="{{ url_for('admin_dashboard') }}" method="GET" class="row g-3">
+            <div class="col-md-4">
+                <label for="priority" class="form-label">الأولوية</label>
+                <select class="form-select auto-submit" id="priority" name="priority">
+                    <option value="">الكل</option>
+                    {% for priority in priorities %}
+                    <option value="{{ priority.id }}" {% if current_priority == priority.id %}selected{% endif %}>
+                        {{ priority.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label for="status" class="form-label">الحالة</label>
+                <select class="form-select auto-submit" id="status" name="status">
+                    <option value="">الكل</option>
+                    {% for status in statuses %}
+                    <option value="{{ status.id }}" {% if current_status == status.id %}selected{% endif %}>
+                        {{ status.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            
+            <div class="col-md-4">
+                <label for="category" class="form-label">التصنيف</label>
+                <select class="form-select auto-submit" id="category" name="category">
+                    <option value="">الكل</option>
+                    {% for category in categories %}
+                    <option value="{{ category.id }}" {% if current_category == category.id %}selected{% endif %}>
+                        {{ category.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- قائمة البلاغات -->
+<div class="card">
+    <div class="card-header bg-light d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">جميع البلاغات</h5>
+        <span class="badge bg-secondary">{{ tickets|length }} بلاغ</span>
+    </div>
+    <div class="card-body p-0">
+        {% if tickets %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">القسم</th>
+                        <th scope="col">الأولوية</th>
+                        <th scope="col">الحالة</th>
+                        <th scope="col">المنشئ</th>
+                        <th scope="col">فني الصيانة</th>
+                        <th scope="col">تاريخ الإنشاء</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in tickets %}
+                    <tr class="
+                        {% if ticket.priority.name == 'عالية' %}priority-high
+                        {% elif ticket.priority.name == 'متوسطة' %}priority-medium
+                        {% elif ticket.priority.name == 'منخفضة' %}priority-low{% endif %}
+                    ">
+                        <th scope="row">{{ ticket.id }}</th>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name }}</td>
+                        <td>
+                            <span class="badge priority-badge" data-priority="{{ ticket.priority.name }}">
+                                {{ ticket.priority.name }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if ticket.status.name == 'جديد' %}bg-danger
+                                {% elif ticket.status.name == 'قيد المعالجة' %}bg-warning text-dark
+                                {% elif ticket.status.name == 'مكتمل' %}bg-success
+                                {% elif ticket.status.name == 'مغلق' %}bg-secondary
+                                {% endif %}">
+                                {{ ticket.status.name }}
+                            </span>
+                        </td>
+                        <td>{{ ticket.creator.name }}</td>
+                        <td>
+                            {% if ticket.assignee %}
+                                {{ ticket.assignee.name }}
+                            {% else %}
+                                <span class="text-muted">غير معين</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{{ url_for('view_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <button class="btn btn-sm btn-warning edit-ticket-btn"
+                                        data-id="{{ ticket.id }}"
+                                        data-title="{{ ticket.title }}"
+                                        data-description="{{ ticket.description }}"
+                                        data-category="{{ ticket.category_id }}"
+                                        data-priority="{{ ticket.priority_id }}"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#editTicketModal">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button class="btn btn-sm btn-danger delete-ticket-btn"
+                                        data-id="{{ ticket.id }}"
+                                        data-title="{{ ticket.title }}"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#deleteTicketModal">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <i class="fas fa-ticket-alt fa-3x text-muted mb-3"></i>
+            <p class="lead">لا توجد بلاغات مطابقة للتصفية</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+
+<!-- تحديث نافذة تعديل البلاغ -->
+<div class="modal fade" id="editTicketModal" tabindex="-1" aria-labelledby="editTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="editTicketModalLabel">تعديل البلاغ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_edit_ticket') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_ticket_id" name="ticket_id">
+                    <div class="mb-3">
+                        <label for="edit_title" class="form-label">عنوان البلاغ</label>
+                        <input type="text" class="form-control" id="edit_title" name="title" required>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_category_id" class="form-label">التصنيف</label>
+                            <select class="form-select" id="edit_category_id" name="category_id" required>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="edit_priority_id" class="form-label">الأولوية</label>
+                            <select class="form-select" id="edit_priority_id" name="priority_id" required>
+                                {% for priority in priorities %}
+                                <option value="{{ priority.id }}">{{ priority.name }} ({{ priority.response_time }} ساعة)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">وصف المشكلة</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="5" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- تحديث نافذة حذف البلاغ -->
+<div class="modal fade" id="deleteTicketModal" tabindex="-1" aria-labelledby="deleteTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteTicketModalLabel">حذف البلاغ</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_delete_ticket') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="delete_ticket_id" name="ticket_id">
+                    <p>هل أنت متأكد من حذف البلاغ <strong id="delete_ticket_title"></strong>؟</p>
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        تحذير: سيتم حذف كافة التعليقات والبيانات المرتبطة بهذا البلاغ بشكل نهائي.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">تأكيد الحذف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# تحضير بيانات الأولويات للاستخدام في JavaScript #}
+<script type="text/javascript">
+    // تخزين ألوان الأولويات وبياناتها
+    var priorityColors = {
+        "عالية": "{{ priority_colors.high if priority_colors and priority_colors.high else '#e74a3b' }}",
+        "متوسطة": "{{ priority_colors.medium if priority_colors and priority_colors.medium else '#f6c23e' }}",
+        "منخفضة": "{{ priority_colors.low if priority_colors and priority_colors.low else '#1cc88a' }}"
+    };
+</script>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    // تطبيق ألوان الأولويات ديناميكيًا
+    document.querySelectorAll('.priority-badge').forEach(badge => {
+        const priority = badge.getAttribute('data-priority');
+        if (priorityColors[priority]) {
+            badge.style.backgroundColor = priorityColors[priority];
+        }
+    });
+
+    // تعبئة بيانات البلاغ في نافذة التعديل
+    const editButtons = document.querySelectorAll('.edit-ticket-btn');
+    editButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const ticketId = this.getAttribute('data-id');
+            const ticketTitle = this.getAttribute('data-title');
+            const ticketDescription = this.getAttribute('data-description');
+            const ticketCategory = this.getAttribute('data-category');
+            const ticketPriority = this.getAttribute('data-priority');
+            
+            document.getElementById('edit_ticket_id').value = ticketId;
+            document.getElementById('edit_title').value = ticketTitle;
+            document.getElementById('edit_description').value = ticketDescription;
+            document.getElementById('edit_category_id').value = ticketCategory;
+            document.getElementById('edit_priority_id').value = ticketPriority;
+        });
+    });
+    
+    // تعبئة بيانات البلاغ في نافذة الحذف
+    const deleteButtons = document.querySelectorAll('.delete-ticket-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const ticketId = this.getAttribute('data-id');
+            const ticketTitle = this.getAttribute('data-title');
+            
+            document.getElementById('delete_ticket_id').value = ticketId;
+            document.getElementById('delete_ticket_title').textContent = ticketTitle;
+        });
+    });
+    
+    // إرسال النموذج تلقائيًا عند تغيير أي من حقول التصفية
+    const autoSubmitFields = document.querySelectorAll('.auto-submit');
+    autoSubmitFields.forEach(field => {
+        field.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="javascript:history.back()" class="btn btn-outline-secondary">
+        <i class="fas fa-arrow-right me-1"></i>العودة
+    </a>
+</div>
+
+{# تحضير بيانات البلاغ والأولويات #}
+<script type="text/javascript">
+    // تحضير ألوان وبيانات الأولويات
+    var ticketData = {
+        "priority": "{{ ticket.priority.name }}",
+        "priorityColor": "{{ ticket.priority.color }}"
+    };
+</script>
+
+<div class="row">
+    <!-- تفاصيل البلاغ -->
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-ticket-alt me-2"></i>بلاغ #{{ ticket.id }}: {{ ticket.title }}
+                </h5>
+                <span class="badge
+                    {% if ticket.status.name == 'جديد' %}bg-danger
+                    {% elif ticket.status.name == 'قيد المعالجة' %}bg-warning text-dark
+                    {% elif ticket.status.name == 'مكتمل' %}bg-success
+                    {% elif ticket.status.name == 'مغلق' %}bg-secondary
+                    {% endif %}">
+                    {{ ticket.status.name }}
+                </span>
+            </div>
+            <div class="card-body">
+                <div class="row mb-4">
+                    <!-- المعلومات الأساسية -->
+                    <div class="col-md-6">
+                        <div class="ticket-info">
+                            <strong>المنشئ:</strong> {{ ticket.creator.name }}
+                        </div>
+                        <div class="ticket-info">
+                            <strong>تاريخ الإنشاء:</strong> {{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}
+                        </div>
+                        <div class="ticket-info">
+                            <strong>الموعد النهائي:</strong>
+                            {% if ticket.due_date %}
+                                <span class="{% if ticket.is_overdue() %}text-danger fw-bold{% endif %}">
+                                    {{ ticket.due_date.strftime('%Y/%m/%d %H:%M') }}
+                                    {% if ticket.is_overdue() %}
+                                        <i class="fas fa-exclamation-triangle ms-1"></i>
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <span class="text-muted">غير محدد</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- معلومات التصنيف -->
+                    <div class="col-md-6">
+                        <div class="ticket-info">
+                            <strong>القسم:</strong> {{ ticket.category.name }}
+                        </div>
+                        <div class="ticket-info">
+                            <strong>الأولوية:</strong>
+                            <span class="badge priority-badge" data-priority="{{ ticket.priority.name }}">
+                                {{ ticket.priority.name }}
+                            </span>
+                        </div>
+                        <div class="ticket-info">
+                            <strong>فني الصيانة:</strong>
+                            {% if ticket.assignee %}
+                                {{ ticket.assignee.name }}
+                            {% else %}
+                                <span class="text-muted">غير معين</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- وصف المشكلة -->
+                <h6 class="fw-bold mb-2">وصف المشكلة:</h6>
+                <div class="p-3 bg-light rounded mb-4">
+                    {{ ticket.description | replace('\n', '<br>') | safe }}
+                </div>
+            </div>
+        </div>
+        
+        <!-- التعليقات -->
+        <div class="card mb-4">
+            <div class="card-header bg-light">
+                <h5 class="mb-0">
+                    <i class="fas fa-comments me-2"></i>التعليقات
+                    <span class="badge bg-secondary ms-2">{{ comments | length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                {% if comments %}
+                    {% for comment in comments %}
+                    <div class="comment-box">
+                        <div class="comment-header">
+                            <div>
+                                <strong>{{ comment.user.name }}</strong>
+                                <span class="badge {% if comment.user.user_type == 'admin' %}bg-danger
+                                      {% elif comment.user.user_type == 'maintenance' %}bg-success
+                                      {% else %}bg-primary{% endif %} ms-2">
+                                    {% if comment.user.user_type == 'admin' %}
+                                        مدير
+                                    {% elif comment.user.user_type == 'maintenance' %}
+                                        فني
+                                    {% else %}
+                                        موظف
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div>{{ comment.created_at.strftime('%Y/%m/%d %H:%M') }}</div>
+                        </div>
+                        <div class="comment-content mt-2">
+                            {{ comment.content | replace('\n', '<br>') | safe }}
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-4">
+                        <i class="fas fa-comments text-muted fa-3x mb-3"></i>
+                        <p>لا توجد تعليقات حتى الآن</p>
+                    </div>
+                {% endif %}
+                
+                <!-- تحديث نموذج إضافة تعليق -->
+                <form action="{{ url_for('add_comment', ticket_id=ticket.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="content" class="form-label">إضافة تعليق:</label>
+                        <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-paper-plane me-1"></i>إرسال
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- الإجراءات والمعلومات الإضافية -->
+    <div class="col-md-4">
+        <!-- الإجراءات -->
+        {% set current_user = get_current_user() %}
+        
+        {% if current_user.user_type == 'admin' %}
+        <!-- تعيين فني صيانة (للمدير فقط) -->
+        <div class="card mb-4">
+            <div class="card-header bg-info text-white">
+                <h5 class="mb-0"><i class="fas fa-user-cog me-2"></i>تعيين فني</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('assign_ticket', ticket_id=ticket.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="maintenance_id" class="form-label">اختر فني الصيانة:</label>
+                        <select class="form-select" id="maintenance_id" name="maintenance_id" required>
+                            <option value="" selected disabled>-- اختر فني الصيانة --</option>
+                            {% for staff in maintenance_staff %}
+                            <option value="{{ staff.id }}" {% if ticket.assigned_to_id == staff.id %}selected{% endif %}>
+                                {{ staff.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-user-plus me-1"></i>تعيين
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if current_user.user_type == 'maintenance' and current_user.id == ticket.assigned_to_id or current_user.user_type == 'admin' %}
+        <!-- تحديث الحالة (للفني أو المدير) -->
+        <div class="card mb-4">
+            <div class="card-header bg-warning text-dark">
+                <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>تحديث الحالة</h5>
+            </div>
+            <div class="card-body">
+                <form action="{{ url_for('change_status', ticket_id=ticket.id) }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="status_id" class="form-label">الحالة الجديدة:</label>
+                        <select class="form-select" id="status_id" name="status_id" required>
+                            {% for status in statuses %}
+                            <option value="{{ status.id }}" {% if ticket.status_id == status.id %}selected{% endif %}>
+                                {{ status.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-warning text-dark">
+                            <i class="fas fa-sync-alt me-1"></i>تحديث الحالة
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- معلومات زمنية -->
+        <div class="card mb-4">
+            <div class="card-header bg-secondary text-white">
+                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>معلومات زمنية</h5>
+            </div>
+            <div class="card-body">
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        تاريخ الإنشاء
+                        <span>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        آخر تحديث
+                        <span>{{ ticket.updated_at.strftime('%Y/%m/%d %H:%M') }}</span>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        الموعد النهائي
+                        {% if ticket.due_date %}
+                            <span class="{% if ticket.is_overdue() %}text-danger fw-bold{% endif %}">
+                                {{ ticket.due_date.strftime('%Y/%m/%d %H:%M') }}
+                                {% if ticket.is_overdue() %}
+                                    <i class="fas fa-exclamation-triangle ms-1"></i>
+                                {% endif %}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">غير محدد</span>
+                        {% endif %}
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        وقت الاستجابة
+                        <span>{{ ticket.priority.response_time }} ساعة</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="text/javascript">
+document.addEventListener('DOMContentLoaded', function() {
+    // تطبيق ألوان الأولويات
+    document.querySelectorAll('.priority-badge').forEach(badge => {
+        badge.style.backgroundColor = ticketData.priorityColor;
+    });
+});
+</script>
+{% endblock %}

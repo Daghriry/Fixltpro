@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">إنشاء بلاغ جديد</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('create_ticket') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="title" class="form-label">عنوان البلاغ</label>
+                        <input type="text" class="form-control" id="title" name="title" required 
+                                placeholder="أدخل عنوانًا موجزًا للبلاغ">
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="category_id" class="form-label">التصنيف</label>
+                            <select class="form-select" id="category_id" name="category_id" required>
+                                <option value="" selected disabled>-- اختر التصنيف --</option>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}">{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="priority_id" class="form-label">الأولوية</label>
+                            <select class="form-select" id="priority_id" name="priority_id" required>
+                                <option value="" selected disabled>-- اختر الأولوية --</option>
+                                {% for priority in priorities %}
+                                <option value="{{ priority.id }}">{{ priority.name }} ({{ priority.response_time }} ساعة)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="description" class="form-label">وصف المشكلة</label>
+                        <textarea class="form-control" id="description" name="description" rows="5" required
+                                  placeholder="صِف المشكلة بالتفصيل..."></textarea>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <div class="d-flex">
+                            <div class="me-3">
+                                <i class="fas fa-info-circle fa-2x"></i>
+                            </div>
+                            <div>
+                                <h6>ملاحظة هامة</h6>
+                                <p class="mb-0">يرجى وصف المشكلة بوضوح وتضمين جميع المعلومات ذات الصلة مثل موقع المشكلة، والأعراض، ومتى بدأت.</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-paper-plane me-2"></i>إرسال البلاغ
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // عرض مدة وقت الاستجابة المتوقعة عند اختيار الأولوية
+        const prioritySelect = document.getElementById('priority_id');
+        
+        prioritySelect.addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            const responseTimeText = selectedOption.textContent.match(/\((\d+) ساعة\)/);
+            const responseTime = responseTimeText ? responseTimeText[1] : '';
+            
+            if (responseTime) {
+                // يمكن عرض معلومات إضافية هنا إذا لزم الأمر
+            }
+        });
+    });
+</script>
+{% endblock %}
