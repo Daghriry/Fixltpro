@@ -3,25 +3,7 @@
 {% block content %}
 <h2 class="mb-4">إدارة التصنيفات</h2>
 
-<!-- روابط الصفحات الإدارية -->
-<div class="row mb-4">
-    <div class="col-12">
-        <div class="btn-group w-100">
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-primary">
-                <i class="fas fa-tachometer-alt me-1"></i>لوحة التحكم
-            </a>
-            <a href="{{ url_for('admin_users') }}" class="btn btn-primary">
-                <i class="fas fa-users me-1"></i>إدارة المستخدمين
-            </a>
-            <a href="{{ url_for('admin_categories') }}" class="btn btn-primary active">
-                <i class="fas fa-tags me-1"></i>إدارة التصنيفات
-            </a>
-            <a href="{{ url_for('admin_report') }}" class="btn btn-primary">
-                <i class="fas fa-chart-bar me-1"></i>تقارير
-            </a>
-        </div>
-    </div>
-</div>
+<!-- إزالة شريط التنقل الثاني للصفحات الإدارية وإبقاء فقط على شريط التنقل الرئيسي في base.html -->
 
 <div class="row">
     <!-- قائمة التصنيفات -->
@@ -33,43 +15,93 @@
             </div>
             <div class="card-body p-0">
                 {% if categories %}
-                <div class="table-responsive">
-                    <table class="table table-hover mb-0">
-                        <thead class="table-light">
-                            <tr>
-                                <th scope="col">#</th>
-                                <th scope="col">اسم التصنيف</th>
-                                <th scope="col">عدد البلاغات</th>
-                                <th scope="col">الإجراءات</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for category in categories %}
-                            <tr>
-                                <th scope="row">{{ category.id }}</th>
-                                <td>{{ category.name }}</td>
-                                <td>{{ category.tickets.count() }}</td>
-                                <td>
-                                    <button class="btn btn-sm btn-warning edit-category-btn" 
-                                            data-id="{{ category.id }}"
-                                            data-name="{{ category.name }}"
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#editCategoryModal">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger delete-category-btn" 
-                                            data-id="{{ category.id }}"
-                                            data-name="{{ category.name }}"
-                                            data-tickets="{{ category.tickets.count() }}"
-                                            data-bs-toggle="modal" 
-                                            data-bs-target="#deleteCategoryModal">
-                                        <i class="fas fa-trash-alt"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="accordion" id="categoryAccordion">
+                    {% for category in categories %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ category.id }}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ category.id }}" aria-expanded="false" aria-controls="collapse{{ category.id }}">
+                                <div class="d-flex justify-content-between align-items-center w-100 pe-3">
+                                    <span>{{ category.name }}</span>
+                                    <div>
+                                        <span class="badge bg-primary me-2">{{ category.subcategories.count() }} تصنيف فرعي</span>
+                                        <span class="badge bg-info">{{ category.tickets.count() }} بلاغ</span>
+                                    </div>
+                                </div>
+                            </button>
+                        </h2>
+                        <div id="collapse{{ category.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ category.id }}" data-bs-parent="#categoryAccordion">
+                            <div class="accordion-body p-0">
+                                <div class="mb-3 p-3 bg-light rounded-0">
+                                    <div class="d-flex align-items-center">
+                                        <div class="btn-group btn-group-sm me-auto">
+                                            <button class="btn btn-warning edit-category-btn" 
+                                                data-id="{{ category.id }}"
+                                                data-name="{{ category.name }}"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#editCategoryModal">
+                                                <i class="fas fa-edit"></i> تعديل
+                                            </button>
+                                            <button class="btn btn-danger delete-category-btn" 
+                                                data-id="{{ category.id }}"
+                                                data-name="{{ category.name }}"
+                                                data-tickets="{{ category.tickets.count() }}"
+                                                data-bs-toggle="modal" 
+                                                data-bs-target="#deleteCategoryModal">
+                                                <i class="fas fa-trash-alt"></i> حذف
+                                            </button>
+                                        </div>
+                                        <button class="btn btn-sm btn-success ms-2" data-bs-toggle="modal" data-bs-target="#addSubCategoryModal" data-category-id="{{ category.id }}" data-category-name="{{ category.name }}">
+                                            <i class="fas fa-plus"></i> إضافة تصنيف فرعي
+                                        </button>
+                                    </div>
+                                </div>
+                                <table class="table table-hover mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th scope="col">#</th>
+                                            <th scope="col">التصنيف الفرعي</th>
+                                            <th scope="col">عدد البلاغات</th>
+                                            <th scope="col">الإجراءات</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% if category.subcategories.count() > 0 %}
+                                            {% for subcategory in category.subcategories %}
+                                            <tr>
+                                                <th scope="row">{{ subcategory.id }}</th>
+                                                <td>{{ subcategory.name }}</td>
+                                                <td>{{ subcategory.tickets.count() }}</td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-warning edit-subcategory-btn" 
+                                                            data-id="{{ subcategory.id }}"
+                                                            data-name="{{ subcategory.name }}"
+                                                            data-category-id="{{ category.id }}"
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#editSubCategoryModal">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <button class="btn btn-sm btn-danger delete-subcategory-btn" 
+                                                            data-id="{{ subcategory.id }}"
+                                                            data-name="{{ subcategory.name }}"
+                                                            data-tickets="{{ subcategory.tickets.count() }}"
+                                                            data-bs-toggle="modal" 
+                                                            data-bs-target="#deleteSubCategoryModal">
+                                                        <i class="fas fa-trash-alt"></i>
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                            {% endfor %}
+                                        {% else %}
+                                            <tr>
+                                                <td colspan="4" class="text-center">لا توجد تصنيفات فرعية</td>
+                                            </tr>
+                                        {% endif %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
                 {% else %}
                 <div class="text-center p-4">
@@ -115,7 +147,7 @@
     </div>
 </div>
 
-<!-- تحديث نافذة تعديل التصنيف -->
+<!-- تعديل التصنيف -->
 <div class="modal fade" id="editCategoryModal" tabindex="-1" aria-labelledby="editCategoryModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -141,7 +173,7 @@
     </div>
 </div>
 
-<!-- تحديث نافذة حذف التصنيف -->
+<!-- حذف التصنيف -->
 <div class="modal fade" id="deleteCategoryModal" tabindex="-1" aria-labelledby="deleteCategoryModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -176,6 +208,89 @@
         </div>
     </div>
 </div>
+
+<!-- إضافة تصنيف فرعي -->
+<div class="modal fade" id="addSubCategoryModal" tabindex="-1" aria-labelledby="addSubCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="addSubCategoryModalLabel">إضافة تصنيف فرعي</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_add_subcategory') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="parent_category_id" name="category_id">
+                    <div class="mb-3">
+                        <label for="parent_category_name" class="form-label">التصنيف الرئيسي</label>
+                        <input type="text" class="form-control" id="parent_category_name" disabled>
+                    </div>
+                    <div class="mb-3">
+                        <label for="subcategory_name" class="form-label">اسم التصنيف الفرعي</label>
+                        <input type="text" class="form-control" id="subcategory_name" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success">إضافة</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- تعديل التصنيف الفرعي -->
+<div class="modal fade" id="editSubCategoryModal" tabindex="-1" aria-labelledby="editSubCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-warning">
+                <h5 class="modal-title" id="editSubCategoryModalLabel">تعديل التصنيف الفرعي</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_edit_subcategory') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="edit_subcategory_id" name="subcategory_id">
+                    <div class="mb-3">
+                        <label for="edit_subcategory_name" class="form-label">اسم التصنيف الفرعي</label>
+                        <input type="text" class="form-control" id="edit_subcategory_name" name="name" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-warning">حفظ التغييرات</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- حذف التصنيف الفرعي -->
+<div class="modal fade" id="deleteSubCategoryModal" tabindex="-1" aria-labelledby="deleteSubCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteSubCategoryModalLabel">حذف التصنيف الفرعي</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <form action="{{ url_for('admin_delete_subcategory') }}" method="POST">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="modal-body">
+                    <input type="hidden" id="delete_subcategory_id" name="subcategory_id">
+                    <p>هل أنت متأكد من حذف التصنيف الفرعي <strong id="delete_subcategory_name"></strong>؟</p>
+                    <div id="subcategory_has_tickets_warning" class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle me-1"></i>
+                        تحذير: هذا التصنيف الفرعي يحتوي على <strong id="subcategory_tickets_count"></strong> بلاغ. سيتم نقل هذه البلاغات إلى التصنيف الرئيسي.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-danger">تأكيد الحذف</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -194,7 +309,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
     
-    // تعبئة بيانات التصنيف في نافذة الحذف
     // تعبئة بيانات التصنيف في نافذة الحذف
     const deleteButtons = document.querySelectorAll('.delete-category-btn');
     deleteButtons.forEach(button => {
@@ -216,7 +330,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 warningDiv.style.display = 'block';
                 replacementDiv.style.display = 'block';
                 ticketsCountSpan.textContent = ticketsCount;
-                replacementSelect.setAttribute('required', 'required'); // إضافة خاصية required
+                replacementSelect.setAttribute('required', 'required');
                 
                 // استثناء التصنيف الحالي من قائمة التصنيفات البديلة
                 for (let i = 0; i < replacementSelect.options.length; i++) {
@@ -229,7 +343,55 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 warningDiv.style.display = 'none';
                 replacementDiv.style.display = 'none';
-                replacementSelect.removeAttribute('required'); // إزالة خاصية required
+                replacementSelect.removeAttribute('required');
+            }
+        });
+    });
+
+    // تعبئة بيانات التصنيف الفرعي في نافذة الإضافة
+    const addSubCategoryButtons = document.querySelectorAll('[data-bs-target="#addSubCategoryModal"]');
+    addSubCategoryButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const categoryId = this.getAttribute('data-category-id');
+            const categoryName = this.getAttribute('data-category-name');
+            
+            document.getElementById('parent_category_id').value = categoryId;
+            document.getElementById('parent_category_name').value = categoryName;
+        });
+    });
+
+    // تعبئة بيانات التصنيف الفرعي في نافذة التعديل
+    const editSubCategoryButtons = document.querySelectorAll('.edit-subcategory-btn');
+    editSubCategoryButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const subcategoryId = this.getAttribute('data-id');
+            const subcategoryName = this.getAttribute('data-name');
+            
+            document.getElementById('edit_subcategory_id').value = subcategoryId;
+            document.getElementById('edit_subcategory_name').value = subcategoryName;
+        });
+    });
+
+    // تعبئة بيانات التصنيف الفرعي في نافذة الحذف
+    const deleteSubCategoryButtons = document.querySelectorAll('.delete-subcategory-btn');
+    deleteSubCategoryButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const subcategoryId = this.getAttribute('data-id');
+            const subcategoryName = this.getAttribute('data-name');
+            const ticketsCount = parseInt(this.getAttribute('data-tickets'));
+            
+            document.getElementById('delete_subcategory_id').value = subcategoryId;
+            document.getElementById('delete_subcategory_name').textContent = subcategoryName;
+            
+            // إظهار/إخفاء تحذير البلاغات بناءً على عدد البلاغات
+            const warningDiv = document.getElementById('subcategory_has_tickets_warning');
+            const ticketsCountSpan = document.getElementById('subcategory_tickets_count');
+            
+            if (ticketsCount > 0) {
+                warningDiv.style.display = 'block';
+                ticketsCountSpan.textContent = ticketsCount;
+            } else {
+                warningDiv.style.display = 'none';
             }
         });
     });

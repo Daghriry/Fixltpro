@@ -22,7 +22,12 @@
         <div class="card mb-4">
             <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h5 class="mb-0">
-                    <i class="fas fa-ticket-alt me-2"></i>بلاغ #{{ ticket.id }}: {{ ticket.title }}
+                    <i class="fas fa-ticket-alt me-2"></i>
+                    {% if ticket.title %}
+                    بلاغ #{{ ticket.id }}: {{ ticket.title }}
+                    {% else %}
+                    بلاغ #{{ ticket.id }}
+                    {% endif %}
                 </h5>
                 <span class="badge
                     {% if ticket.status.name == 'جديد' %}bg-danger
@@ -34,7 +39,21 @@
                 </span>
             </div>
             <div class="card-body">
-                <div class="row mb-4">
+                <!-- معلومات القسم والإدارة -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="ticket-info">
+                            <strong>الإدارة:</strong> {{ ticket.department.name if ticket.department else 'غير محدد' }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="ticket-info">
+                            <strong>القسم:</strong> {{ ticket.section.name if ticket.section else 'غير محدد' }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row mb-3">
                     <!-- المعلومات الأساسية -->
                     <div class="col-md-6">
                         <div class="ticket-info">
@@ -61,7 +80,10 @@
                     <!-- معلومات التصنيف -->
                     <div class="col-md-6">
                         <div class="ticket-info">
-                            <strong>القسم:</strong> {{ ticket.category.name }}
+                            <strong>التصنيف:</strong> {{ ticket.category.name }}
+                            {% if ticket.subcategory %}
+                                <span class="badge bg-secondary ms-1">{{ ticket.subcategory.name }}</span>
+                            {% endif %}
                         </div>
                         <div class="ticket-info">
                             <strong>الأولوية:</strong>
@@ -85,6 +107,60 @@
                 <div class="p-3 bg-light rounded mb-4">
                     {{ ticket.description | replace('\n', '<br>') | safe }}
                 </div>
+
+                <!-- المرفقات -->
+                {% if ticket.attachments.count() > 0 %}
+                <h6 class="fw-bold mb-2">المرفقات:</h6>
+                <div class="row mb-4">
+                    {% for attachment in ticket.attachments %}
+                    <div class="col-md-4 col-sm-6 mb-3">
+                        <div class="card h-100">
+                            <div class="card-body text-center p-2">
+                                {% if attachment.file_type and attachment.file_type.startswith('image/') %}
+                                    <a href="javascript:void(0)" 
+                                       data-url="{{ url_for('view_attachment', attachment_id=attachment.id) }}"
+                                       data-type="{{ attachment.file_type }}"
+                                       data-filename="{{ attachment.filename }}"
+                                       class="preview-attachment-link d-block">
+                                        <img src="{{ url_for('view_attachment', attachment_id=attachment.id) }}" 
+                                             alt="{{ attachment.filename }}" 
+                                             class="img-fluid attachment-thumbnail mb-2" 
+                                             style="max-height: 120px;">
+                                    </a>
+                                {% elif attachment.file_type and 'pdf' in attachment.file_type %}
+                                    <a href="javascript:void(0)" 
+                                       data-url="{{ url_for('view_attachment', attachment_id=attachment.id) }}"
+                                       data-type="{{ attachment.file_type }}"
+                                       data-filename="{{ attachment.filename }}"
+                                       class="preview-attachment-link d-block">
+                                        <i class="fas fa-file-pdf fa-4x text-danger mb-2"></i>
+                                    </a>
+                                {% elif attachment.file_type and ('word' in attachment.file_type or 'document' in attachment.file_type) %}
+                                    <i class="fas fa-file-word fa-4x text-primary mb-2"></i>
+                                {% elif attachment.file_type and ('excel' in attachment.file_type or 'spreadsheet' in attachment.file_type) %}
+                                    <i class="fas fa-file-excel fa-4x text-success mb-2"></i>
+                                {% else %}
+                                    <i class="fas fa-file fa-4x text-secondary mb-2"></i>
+                                {% endif %}
+                                <p class="small text-truncate mb-1">{{ attachment.filename }}</p>
+                                <div class="btn-group btn-group-sm w-100">
+                                    <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" class="btn btn-sm btn-outline-primary">
+                                        <i class="fas fa-download"></i> تحميل
+                                    </a>
+                                    <a href="javascript:void(0)" 
+                                       data-url="{{ url_for('view_attachment', attachment_id=attachment.id) }}"
+                                       data-type="{{ attachment.file_type }}"
+                                       data-filename="{{ attachment.filename }}"
+                                       class="preview-attachment-link btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-eye"></i> معاينة
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
         </div>
         
@@ -130,11 +206,16 @@
                 {% endif %}
                 
                 <!-- تحديث نموذج إضافة تعليق -->
-                <form action="{{ url_for('add_comment', ticket_id=ticket.id) }}" method="POST">
+                <form action="{{ url_for('add_comment', ticket_id=ticket.id) }}" method="POST" enctype="multipart/form-data">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     <div class="mb-3">
                         <label for="content" class="form-label">إضافة تعليق:</label>
                         <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="comment_attachments" class="form-label">المرفقات (اختياري)</label>
+                        <input type="file" class="form-control" id="comment_attachments" name="comment_attachments" multiple>
+                        <div class="form-text">يمكنك إرفاق ملفات مع التعليق (الحد الأقصى 2 ملفات)</div>
                     </div>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-paper-plane me-1"></i>إرسال
@@ -245,6 +326,27 @@
         </div>
     </div>
 </div>
+
+<!-- نافذة معاينة المرفقات -->
+<div class="modal fade" id="attachmentPreviewModal" tabindex="-1" aria-labelledby="attachmentPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="attachmentPreviewModalLabel">معاينة المرفق</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body text-center" id="attachmentPreviewContent">
+                <!-- سيتم عرض محتوى المرفق هنا -->
+            </div>
+            <div class="modal-footer">
+                <a href="#" class="btn btn-primary" id="attachmentDownloadLink">
+                    <i class="fas fa-download me-1"></i>تحميل
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -254,6 +356,80 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.priority-badge').forEach(badge => {
         badge.style.backgroundColor = ticketData.priorityColor;
     });
+    
+    // إضافة معالج حدث لروابط المعاينة
+    document.querySelectorAll('.preview-attachment-link').forEach(link => {
+        link.addEventListener('click', function() {
+            const url = this.getAttribute('data-url');
+            const type = this.getAttribute('data-type');
+            const filename = this.getAttribute('data-filename');
+            previewAttachment(url, type, filename);
+        });
+    });
 });
+
+// دالة لعرض المرفق
+function previewAttachment(url, type, filename) {
+    const previewContent = document.getElementById('attachmentPreviewContent');
+    const modalTitle = document.getElementById('attachmentPreviewModalLabel');
+    const downloadLink = document.getElementById('attachmentDownloadLink');
+    
+    // تعيين عنوان النافذة
+    modalTitle.textContent = filename;
+    
+    // تعيين رابط التحميل
+    downloadLink.href = url + '?download=true';
+    
+    // تفريغ محتوى المعاينة
+    previewContent.innerHTML = '';
+    
+    // عرض المرفق حسب نوعه
+    if (type && type.startsWith('image/')) {
+        // إذا كان صورة
+        const img = document.createElement('img');
+        img.src = url;
+        img.alt = filename;
+        img.className = 'img-fluid';
+        img.style.maxHeight = '70vh';
+        previewContent.appendChild(img);
+    } else if (type && type.includes('pdf')) {
+        // إذا كان PDF
+        const embed = document.createElement('embed');
+        embed.src = url;
+        embed.type = 'application/pdf';
+        embed.style.width = '100%';
+        embed.style.height = '70vh';
+        previewContent.appendChild(embed);
+    } else {
+        // إذا كان نوع آخر لا يمكن معاينته
+        const icon = document.createElement('i');
+        
+        if (type && type.includes('word')) {
+            icon.className = 'fas fa-file-word fa-5x text-primary mb-3';
+        } else if (type && type.includes('document')) {
+            icon.className = 'fas fa-file-word fa-5x text-primary mb-3';
+        } else if (type && type.includes('excel')) {
+            icon.className = 'fas fa-file-excel fa-5x text-success mb-3';
+        } else if (type && type.includes('spreadsheet')) {
+            icon.className = 'fas fa-file-excel fa-5x text-success mb-3';
+        } else if (type && type.includes('zip')) {
+            icon.className = 'fas fa-file-archive fa-5x text-warning mb-3';
+        } else if (type && type.includes('compressed')) {
+            icon.className = 'fas fa-file-archive fa-5x text-warning mb-3';
+        } else {
+            icon.className = 'fas fa-file fa-5x text-secondary mb-3';
+        }
+        
+        previewContent.appendChild(icon);
+        
+        const message = document.createElement('p');
+        message.textContent = 'لا يمكن معاينة هذا النوع من الملفات. يرجى تحميل الملف لفتحه.';
+        previewContent.appendChild(message);
+    }
+    
+    // فتح النافذة
+    const previewModal = new bootstrap.Modal(document.getElementById('attachmentPreviewModal'));
+    previewModal.show();
+}
 </script>
 {% endblock %}

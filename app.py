@@ -5,15 +5,17 @@
 Fixltpro - نظام بلاغات الدعم الفني - تطبيق Flask مع SQLite
 """
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect  # إضافة حماية CSRF
 from flask_wtf import FlaskForm  # استيراد FlaskForm
 from wtforms import StringField, PasswordField, BooleanField, validators  # استيراد حقول النموذج
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
 import os
+
 
 # إنشاء تطبيق Flask
 app = Flask(__name__)
@@ -29,6 +31,22 @@ csrf = CSRFProtect(app)
 
 # إنشاء قاعدة البيانات
 db = SQLAlchemy(app)
+
+
+# إعداد مسار المرفقات
+UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 ميجابايت كحد أقصى
+
+# الامتدادات المسموح بها
+ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 'xls', 'xlsx', 'txt'}
+
+def allowed_file(filename):
+    """التحقق من امتداد الملف"""
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 # تعريف نماذج قاعدة البيانات
 class User(db.Model):
@@ -90,14 +108,48 @@ class Category(db.Model):
     name = db.Column(db.String(100), nullable=False)
     
     tickets = db.relationship('Ticket', backref='category', lazy='dynamic')
+    subcategories = db.relationship('SubCategory', backref='parent_category', lazy='dynamic', cascade='all, delete-orphan')
 
+class SubCategory(db.Model):
+    """نموذج التصنيف الفرعي للبلاغ"""
+    __tablename__ = 'subcategories'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
+    
+    tickets = db.relationship('Ticket', backref='subcategory', lazy='dynamic')
+
+
+class Department(db.Model):
+    """نموذج الإدارات"""
+    __tablename__ = 'departments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    
+    # العلاقة مع الأقسام
+    sections = db.relationship('Section', backref='department', lazy='dynamic', cascade='all, delete-orphan')
+    tickets = db.relationship('Ticket', backref='department', lazy='dynamic')
+
+
+class Section(db.Model):
+    """نموذج الأقسام"""
+    __tablename__ = 'sections'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=False)
+    
+    tickets = db.relationship('Ticket', backref='section', lazy='dynamic')
+    
 
 class Ticket(db.Model):
     """نموذج البلاغ"""
     __tablename__ = 'tickets'
     
     id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100), nullable=False)
+    title = db.Column(db.String(100))  # جعلها اختيارية
     description = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -106,16 +158,38 @@ class Ticket(db.Model):
     created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     assigned_to_id = db.Column(db.Integer, db.ForeignKey('users.id'))
     category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
+    subcategory_id = db.Column(db.Integer, db.ForeignKey('subcategories.id'))
+    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'))
+    section_id = db.Column(db.Integer, db.ForeignKey('sections.id'))
     priority_id = db.Column(db.Integer, db.ForeignKey('priorities.id'), nullable=False)
     status_id = db.Column(db.Integer, db.ForeignKey('statuses.id'), nullable=False)
     
     comments = db.relationship('Comment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
-    
+    attachments = db.relationship('Attachment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
+
+
     def is_overdue(self):
         """التحقق مما إذا كان البلاغ متأخراً"""
         if not self.due_date:
             return False
         return datetime.utcnow() > self.due_date
+
+
+class Attachment(db.Model):
+    """نموذج المرفقات"""
+    __tablename__ = 'attachments'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(255), nullable=False)
+    file_type = db.Column(db.String(50))  # نوع الملف (صورة، PDF، إلخ)
+    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # إضافة علاقة مع المستخدم الذي قام برفع الملف
+    
+    # إضافة علاقة مع المستخدم
+    user = db.relationship('User', backref='attachments')
 
 
 class Comment(db.Model):
@@ -340,48 +414,170 @@ def assign_ticket(ticket_id):
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 
+
+# تعديل مسار إنشاء البلاغ
 @app.route('/ticket/create', methods=['GET', 'POST'])
 @login_required('employee')
 def create_ticket():
     """صفحة إنشاء بلاغ جديد للموظف"""
     categories = Category.query.all()
+    departments = Department.query.all()
     priorities = TicketPriority.query.all()
     
+    # الحصول على قائمة فنيي الصيانة لعرضها في القائمة المنسدلة
+    maintenance_staff = User.query.filter_by(user_type='maintenance').all()
+    
     if request.method == 'POST':
-        title = request.form.get('title')
         description = request.form.get('description')
         category_id = request.form.get('category_id', type=int)
+        subcategory_id = request.form.get('subcategory_id')
+        department_id = request.form.get('department_id')
+        section_id = request.form.get('section_id')
         priority_id = request.form.get('priority_id', type=int)
+        assigned_to_id = request.form.get('assigned_to_id')  # معرف فني الصيانة المعين
         
-        if not all([title, description, category_id, priority_id]):
-            flash('يرجى ملء جميع الحقول', 'error')
-            return render_template('create_ticket.html', categories=categories, priorities=priorities)
+        # تحويل القيم إلى None إذا كانت '0' أو فارغة
+        if subcategory_id in ['0', '', None]:
+            subcategory_id = None
+        else:
+            subcategory_id = int(subcategory_id)
+            
+        if department_id in ['0', '', None]:
+            department_id = None
+        else:
+            department_id = int(department_id)
+            
+        if section_id in ['0', '', None]:
+            section_id = None
+        else:
+            section_id = int(section_id)
+            
+        if assigned_to_id in ['0', '', None]:
+            assigned_to_id = None
+        else:
+            assigned_to_id = int(assigned_to_id)
         
-        # الحصول على حالة "جديد"
-        new_status = TicketStatus.query.filter_by(name='جديد').first()
-        if not new_status:
-            flash('خطأ في النظام: حالة "جديد" غير موجودة', 'error')
-            return render_template('create_ticket.html', categories=categories, priorities=priorities)
+        if not all([description, category_id, priority_id]):
+            flash('يرجى ملء جميع الحقول المطلوبة', 'error')
+            return render_template('create_ticket.html', 
+                                  categories=categories, 
+                                  priorities=priorities, 
+                                  departments=departments,
+                                  maintenance_staff=maintenance_staff)
+        
+        # الحصول على حالة "جديد" أو "قيد المعالجة" حسب ما إذا تم تعيين فني أم لا
+        if assigned_to_id:
+            # إذا تم تعيين فني، نجعل حالة البلاغ "قيد المعالجة"
+            status = TicketStatus.query.filter_by(name='قيد المعالجة').first()
+        else:
+            # إذا لم يتم تعيين فني، نجعل حالة البلاغ "جديد"
+            status = TicketStatus.query.filter_by(name='جديد').first()
+            
+        if not status:
+            flash('خطأ في النظام: حالة البلاغ غير موجودة', 'error')
+            return render_template('create_ticket.html', 
+                                  categories=categories, 
+                                  priorities=priorities, 
+                                  departments=departments,
+                                  maintenance_staff=maintenance_staff)
+        
+        # إنشاء عنوان افتراضي للبلاغ إذا لم يتم توفيره
+        auto_title = f"{Category.query.get(category_id).name}"
+        if subcategory_id:
+            auto_title += f" - {SubCategory.query.get(subcategory_id).name}"
+        if department_id:
+            auto_title += f" - {Department.query.get(department_id).name}"
+            if section_id:
+                auto_title += f" - {Section.query.get(section_id).name}"
         
         # إنشاء البلاغ الجديد
         ticket = Ticket(
-            title=title,
+            title=auto_title,  # استخدام العنوان الافتراضي المنشأ تلقائيًا
             description=description,
             created_by_id=session['user_id'],
             category_id=category_id,
+            subcategory_id=subcategory_id,
+            department_id=department_id,
+            section_id=section_id,
             priority_id=priority_id,
-            status_id=new_status.id,
+            assigned_to_id=assigned_to_id,  # تعيين الفني المسؤول
+            status_id=status.id,
             due_date=calculate_due_date(priority_id)
         )
         
         db.session.add(ticket)
         db.session.commit()
         
+        # معالجة المرفقات
+        uploaded_files = request.files.getlist('attachments')
+        if uploaded_files:
+            upload_dir = os.path.join(basedir, 'uploads')
+            if not os.path.exists(upload_dir):
+                os.makedirs(upload_dir)
+            
+            for file in uploaded_files[:5]:  # الحد الأقصى 5 ملفات
+                if file and file.filename:
+                    # إنشاء اسم ملف فريد
+                    filename = secure_filename(file.filename)
+                    unique_filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_{filename}"
+                    file_path = os.path.join(upload_dir, unique_filename)
+                    
+                    # حفظ الملف
+                    file.save(file_path)
+                    
+                    # إنشاء سجل المرفق مع إضافة معرف المستخدم
+                    attachment = Attachment(
+                        filename=filename,
+                        file_path=file_path,
+                        file_type=file.content_type,
+                        ticket_id=ticket.id,
+                        user_id=session['user_id']  # إضافة معرف المستخدم الحالي
+                    )
+                    db.session.add(attachment)
+        
+        # إذا تم تعيين فني، أضف تعليق تلقائي يشير إلى ذلك
+        if assigned_to_id:
+            tech_name = User.query.get(assigned_to_id).name
+            comment = Comment(
+                content=f"تم تعيين البلاغ إلى {tech_name} عند إنشاء البلاغ.",
+                ticket_id=ticket.id,
+                user_id=session['user_id']
+            )
+            db.session.add(comment)
+        
+        db.session.commit()
+        
         flash('تم إنشاء البلاغ بنجاح', 'success')
         return redirect(url_for('view_ticket', ticket_id=ticket.id))
     
-    return render_template('create_ticket.html', categories=categories, priorities=priorities)
+    return render_template('create_ticket.html', 
+                          categories=categories, 
+                          priorities=priorities, 
+                          departments=departments,
+                          maintenance_staff=maintenance_staff)
 
+
+
+@app.route('/search_ticket')
+@login_required()
+def search_ticket():
+    """البحث عن بلاغ برقم البلاغ والانتقال إليه مباشرة"""
+    ticket_id = request.args.get('ticket_id', '')
+    
+    # التحقق من صحة رقم البلاغ
+    if not ticket_id.isdigit():
+        flash('الرجاء إدخال رقم بلاغ صحيح', 'error')
+        return redirect(request.referrer or url_for('index'))
+    
+    # محاولة العثور على البلاغ
+    ticket = Ticket.query.get(int(ticket_id))
+    
+    if not ticket:
+        flash(f'لم يتم العثور على بلاغ برقم {ticket_id}', 'error')
+        return redirect(request.referrer or url_for('index'))
+    
+    # الانتقال مباشرة إلى صفحة البلاغ
+    return redirect(url_for('view_ticket', ticket_id=ticket.id))
 
 @app.route('/ticket/<int:ticket_id>')
 @login_required()
@@ -390,15 +586,13 @@ def view_ticket(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
     current_user = get_current_user()
     
-    # التحقق من الصلاحيات - يمكن للمدير ولفني الصيانة المسؤول وللموظف صاحب البلاغ عرضه
-    if (current_user.user_type != 'admin' and
-        current_user.id != ticket.created_by_id and
-        (current_user.user_type != 'maintenance' or current_user.id != ticket.assigned_to_id)):
-        flash('ليس لديك صلاحية لعرض هذا البلاغ', 'error')
-        return redirect(url_for('index'))
+    # لا نحتاج للتحقق من الصلاحيات - أي مستخدم يمكنه الوصول للبلاغات
     
     # الحصول على التعليقات
     comments = ticket.comments.order_by(Comment.created_at).all()
+    
+    # الحصول على المرفقات
+    attachments = ticket.attachments.order_by(Attachment.upload_date.desc()).all()
     
     # الحصول على فنيي الصيانة للتعيين (للمدير فقط)
     maintenance_staff = []
@@ -412,11 +606,12 @@ def view_ticket(ticket_id):
         'view_ticket.html',
         ticket=ticket,
         comments=comments,
+        attachments=attachments,
         maintenance_staff=maintenance_staff,
         statuses=statuses
     )
 
-
+# تعديل مسار إضافة تعليق لدعم المرفقات أيضاً
 @app.route('/ticket/<int:ticket_id>/comment', methods=['POST'])
 @login_required()
 def add_comment(ticket_id):
@@ -435,11 +630,42 @@ def add_comment(ticket_id):
     )
     
     db.session.add(comment)
+    db.session.flush()  # للحصول على معرف التعليق
+    
+    # معالجة المرفقات للتعليق
+    uploaded_files = request.files.getlist('comment_attachments')
+    if uploaded_files:
+        upload_dir = os.path.join(basedir, 'uploads')
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+        
+        for file in uploaded_files[:2]:  # الحد الأقصى 2 ملفات للتعليق
+            if file and file.filename:
+                # إنشاء اسم ملف فريد
+                filename = secure_filename(file.filename)
+                unique_filename = f"{datetime.utcnow().strftime('%Y%m%d%H%M%S')}_comment_{comment.id}_{filename}"
+                file_path = os.path.join(upload_dir, unique_filename)
+                
+                # حفظ الملف
+                file.save(file_path)
+                
+                # تحديث محتوى التعليق لتضمين إشارة للمرفق
+                comment.content += f"\n\n[مرفق: {filename}]"
+                
+                # إنشاء سجل المرفق مرتبط بالبلاغ وإضافة معرف المستخدم
+                attachment = Attachment(
+                    filename=filename,
+                    file_path=file_path,
+                    file_type=file.content_type,
+                    ticket_id=ticket_id,
+                    user_id=session['user_id']  # إضافة معرف المستخدم الحالي
+                )
+                db.session.add(attachment)
+    
     db.session.commit()
     
     flash('تم إضافة التعليق بنجاح', 'success')
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
-
 
 @app.route('/ticket/<int:ticket_id>/status', methods=['POST'])
 @login_required()
@@ -509,18 +735,23 @@ def setup_database():
         flash('تم إعداد قاعدة البيانات مسبقاً', 'info')
         return redirect(url_for('index'))
     
+    # إنشاء مجلد التحميلات إذا لم يكن موجودًا
+    upload_dir = os.path.join(basedir, 'uploads')
+    if not os.path.exists(upload_dir):
+        os.makedirs(upload_dir)
+    
     # إنشاء المستخدمين
     admin = User(username='admin', name='مدير النظام', user_type='admin', email='admin@fixltpro.com', phone='0500000000')
     admin.password = 'admin123'
     
     employee1 = User(username='employee1', name='موظف الاستقبال', user_type='employee', email='employee@fixltpro.com', phone='0500000001')
-    employee1.password = 'emp123'
+    employee1.password = 'employee1'
     
     maintenance1 = User(username='maintenance1', name='فني الصيانة 1', user_type='maintenance', email='maint1@fixltpro.com', phone='0500000002')
-    maintenance1.password = 'mtn123'
+    maintenance1.password = 'maintenance1'
     
     maintenance2 = User(username='maintenance2', name='فني الصيانة 2', user_type='maintenance', email='maint2@fixltpro.com', phone='0500000003')
-    maintenance2.password = 'mtn123'
+    maintenance2.password = 'maintenance2'
     
     db.session.add_all([admin, employee1, maintenance1, maintenance2])
     
@@ -547,6 +778,53 @@ def setup_database():
     
     db.session.add_all([hardware, network, software, other])
     
+    # إنشاء التصنيفات الفرعية
+    hardware_subcats = [
+        SubCategory(name='أجهزة الحاسب المكتبية', category_id=1),
+        SubCategory(name='أجهزة الحاسب المحمولة', category_id=1),
+        SubCategory(name='الطابعات', category_id=1),
+        SubCategory(name='أجهزة العرض', category_id=1)
+    ]
+    
+    network_subcats = [
+        SubCategory(name='الإنترنت', category_id=2),
+        SubCategory(name='الشبكة الداخلية', category_id=2),
+        SubCategory(name='نقاط الوصول اللاسلكية', category_id=2)
+    ]
+    
+    software_subcats = [
+        SubCategory(name='نظام التشغيل', category_id=3),
+        SubCategory(name='برامج المكتب', category_id=3),
+        SubCategory(name='تطبيقات المؤسسة', category_id=3),
+        SubCategory(name='البرامج المضادة للفيروسات', category_id=3)
+    ]
+    
+    db.session.add_all(hardware_subcats + network_subcats + software_subcats)
+    
+    # إنشاء الإدارات
+    dept1 = Department(name='الإدارة العامة')
+    dept2 = Department(name='الموارد البشرية')
+    dept3 = Department(name='المالية')
+    dept4 = Department(name='تقنية المعلومات')
+    
+    db.session.add_all([dept1, dept2, dept3, dept4])
+    db.session.flush()
+    
+    # إنشاء الأقسام
+    sections = [
+        Section(name='مكتب المدير العام', department_id=dept1.id),
+        Section(name='العلاقات العامة', department_id=dept1.id),
+        Section(name='التوظيف', department_id=dept2.id),
+        Section(name='التطوير الوظيفي', department_id=dept2.id),
+        Section(name='المحاسبة', department_id=dept3.id),
+        Section(name='المشتريات', department_id=dept3.id),
+        Section(name='الدعم الفني', department_id=dept4.id),
+        Section(name='البنية التحتية', department_id=dept4.id),
+        Section(name='تطوير البرمجيات', department_id=dept4.id)
+    ]
+    
+    db.session.add_all(sections)
+    
     # حفظ التغييرات
     db.session.commit()
     
@@ -556,6 +834,9 @@ def setup_database():
         description='جهاز الحاسب في قسم المحاسبة لا يعمل بشكل صحيح',
         created_by_id=employee1.id,
         category_id=hardware.id,
+        subcategory_id=hardware_subcats[0].id,  # أجهزة الحاسب المكتبية
+        department_id=dept3.id,  # المالية
+        section_id=sections[4].id,  # المحاسبة
         priority_id=high_priority.id,
         status_id=new_status.id,
         due_date=datetime.utcnow() + timedelta(hours=24)
@@ -566,6 +847,9 @@ def setup_database():
         description='شبكة الإنترنت غير متوفرة في الطابق الثاني',
         created_by_id=employee1.id,
         category_id=network.id,
+        subcategory_id=network_subcats[0].id,  # الإنترنت
+        department_id=dept4.id,  # تقنية المعلومات
+        section_id=sections[7].id,  # البنية التحتية
         priority_id=medium_priority.id,
         status_id=new_status.id,
         due_date=datetime.utcnow() + timedelta(hours=72)
@@ -576,6 +860,17 @@ def setup_database():
     
     flash('تم إعداد قاعدة البيانات بنجاح', 'success')
     return redirect(url_for('index'))
+
+# تعديل الـ context processor لإضافة متغيرات جديدة
+@app.context_processor
+def inject_common_data():
+    """إضافة بيانات مشتركة إلى جميع القوالب"""
+    return {
+        'get_current_user': get_current_user,
+        'now': datetime.now(),
+        'categories': Category.query.all(),
+        'departments': Department.query.all()
+    }
 
 
 # إضافة دالة لتوفير المستخدم الحالي في قوالب الصفحات
@@ -1244,6 +1539,414 @@ def maintenance_reports():
         category_stats_raw=category_stats,  # إرسال البيانات الأصلية
         recent_completed=recent_completed
     )
+
+@app.route('/ticket/<int:ticket_id>/upload', methods=['POST'])
+@login_required()
+def upload_attachment(ticket_id):
+    """رفع مرفق جديد للبلاغ"""
+    ticket = Ticket.query.get_or_404(ticket_id)
+    current_user = get_current_user()
+    
+    # التحقق من صلاحية الوصول للبلاغ
+    if (current_user.user_type != 'admin' and
+        current_user.id != ticket.created_by_id and
+        (current_user.user_type != 'maintenance' or current_user.id != ticket.assigned_to_id)):
+        flash('ليس لديك صلاحية لإضافة مرفقات لهذا البلاغ', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+    
+    # التحقق من وجود ملف في الطلب
+    if 'attachment' not in request.files:
+        flash('لم يتم تحديد ملف', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+    
+    file = request.files['attachment']
+    
+    # التحقق من اختيار ملف
+    if file.filename == '':
+        flash('لم يتم اختيار ملف', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+    
+    # التحقق من صلاحية امتداد الملف
+    if not allowed_file(file.filename):
+        flash('امتداد الملف غير مسموح به', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+    
+    # تأمين اسم الملف
+    original_filename = file.filename
+    filename = secure_filename(original_filename)
+    
+    # إنشاء اسم فريد للملف المخزن
+    import uuid
+    stored_filename = f"{uuid.uuid4()}_{filename}"
+    
+    # حفظ الملف
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], stored_filename)
+    file.save(file_path)
+    
+    # إنشاء سجل للمرفق في قاعدة البيانات
+    attachment = Attachment(
+        filename=original_filename,
+        stored_filename=stored_filename,
+        file_type=file.content_type,
+        file_size=os.path.getsize(file_path),
+        ticket_id=ticket_id,
+        user_id=current_user.id
+    )
+    
+    db.session.add(attachment)
+    db.session.commit()
+    
+    # إضافة تعليق تلقائي عن إضافة المرفق
+    comment = Comment(
+        content=f'تم إضافة مرفق: {original_filename}',
+        ticket_id=ticket_id,
+        user_id=current_user.id
+    )
+    db.session.add(comment)
+    db.session.commit()
+    
+    flash('تم رفع المرفق بنجاح', 'success')
+    return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+
+@app.route('/attachments/<int:attachment_id>/download')
+@login_required()
+def download_attachment(attachment_id):
+    """تحميل المرفق"""
+    return view_attachment(attachment_id)  # تحويل مباشر إلى مسار المعاينة مع إضافة معلمة download=true
+
+# Route للحصول على التصنيفات الفرعية
+@app.route('/api/subcategories/<int:category_id>')
+@login_required()
+def get_subcategories(category_id):
+    """الحصول على التصنيفات الفرعية لتصنيف معين"""
+    subcategories = SubCategory.query.filter_by(category_id=category_id).all()
+    
+    # تحويل الكائنات إلى قائمة للتمثيل JSON
+    subcategories_list = []
+    for subcategory in subcategories:
+        subcategories_list.append({
+            'id': subcategory.id,
+            'name': subcategory.name
+        })
+    
+    return jsonify({'subcategories': subcategories_list})
+
+# Route للحصول على الأقسام
+@app.route('/api/sections/<int:department_id>')
+@login_required()
+def get_sections(department_id):
+    """الحصول على الأقسام لإدارة معينة"""
+    sections = Section.query.filter_by(department_id=department_id).all()
+    
+    # تحويل الكائنات إلى قائمة للتمثيل JSON
+    sections_list = []
+    for section in sections:
+        sections_list.append({
+            'id': section.id,
+            'name': section.name
+        })
+    
+    return jsonify({'sections': sections_list})
+
+# مسار إضافة التصنيف الفرعي
+@app.route('/admin/subcategories/add', methods=['POST'])
+@login_required('admin')
+def admin_add_subcategory():
+    """إضافة تصنيف فرعي جديد"""
+    category_id = request.form.get('category_id', type=int)
+    name = request.form.get('name')
+    
+    # التحقق من وجود التصنيف الرئيسي
+    category = Category.query.get_or_404(category_id)
+    
+    # التحقق من عدم وجود تصنيف فرعي بنفس الاسم للتصنيف الرئيسي نفسه
+    existing_subcategory = SubCategory.query.filter_by(name=name, category_id=category_id).first()
+    if existing_subcategory:
+        flash('التصنيف الفرعي موجود بالفعل', 'error')
+        return redirect(url_for('admin_categories'))
+    
+    # إنشاء تصنيف فرعي جديد
+    subcategory = SubCategory(name=name, category_id=category_id)
+    db.session.add(subcategory)
+    db.session.commit()
+    
+    flash('تم إضافة التصنيف الفرعي بنجاح', 'success')
+    return redirect(url_for('admin_categories'))
+
+# مسار تعديل التصنيف الفرعي
+@app.route('/admin/subcategories/edit', methods=['POST'])
+@login_required('admin')
+def admin_edit_subcategory():
+    """تعديل تصنيف فرعي"""
+    subcategory_id = request.form.get('subcategory_id', type=int)
+    name = request.form.get('name')
+    
+    subcategory = SubCategory.query.get_or_404(subcategory_id)
+    
+    # التحقق من عدم وجود تصنيف فرعي آخر بنفس الاسم للتصنيف الرئيسي نفسه
+    existing_subcategory = SubCategory.query.filter_by(name=name, category_id=subcategory.category_id).first()
+    if existing_subcategory and existing_subcategory.id != subcategory_id:
+        flash('يوجد تصنيف فرعي آخر بنفس الاسم', 'error')
+        return redirect(url_for('admin_categories'))
+    
+    # تحديث اسم التصنيف الفرعي
+    subcategory.name = name
+    db.session.commit()
+    
+    flash('تم تحديث التصنيف الفرعي بنجاح', 'success')
+    return redirect(url_for('admin_categories'))
+
+# مسار حذف التصنيف الفرعي
+@app.route('/admin/subcategories/delete', methods=['POST'])
+@login_required('admin')
+def admin_delete_subcategory():
+    """حذف تصنيف فرعي"""
+    subcategory_id = request.form.get('subcategory_id', type=int)
+    
+    subcategory = SubCategory.query.get_or_404(subcategory_id)
+    
+    # نقل البلاغات من التصنيف الفرعي إلى التصنيف الرئيسي
+    if subcategory.tickets.count() > 0:
+        Ticket.query.filter_by(subcategory_id=subcategory_id).update({'subcategory_id': None})
+        db.session.flush()
+    
+    # حذف التصنيف الفرعي
+    db.session.delete(subcategory)
+    db.session.commit()
+    
+    flash('تم حذف التصنيف الفرعي بنجاح', 'success')
+    return redirect(url_for('admin_categories'))
+
+# مسار صفحة إدارة الإدارات
+@app.route('/admin/departments')
+@login_required('admin')
+def admin_departments():
+    """صفحة إدارة الإدارات"""
+    departments = Department.query.all()
+    
+    # تحضير بيانات الإدارات بتنسيق JSON لاستخدامها في الرسم البياني
+    departments_data = []
+    for department in departments:
+        departments_data.append({
+            'id': department.id,
+            'name': department.name,
+            'tickets_count': department.tickets.count(),
+            'sections_count': department.sections.count()
+        })
+    
+    # تحويل البيانات إلى سلسلة JSON
+    import json
+    departments_json_str = json.dumps(departments_data)
+    
+    return render_template('admin_departments.html', 
+                          departments=departments,
+                          departments_data=departments_data,
+                          departments_json=departments_json_str)
+
+# مسار إضافة إدارة جديدة
+@app.route('/admin/departments/add', methods=['POST'])
+@login_required('admin')
+def admin_add_department():
+    """إضافة إدارة جديدة"""
+    name = request.form.get('name')
+    
+    # التحقق من عدم وجود إدارة بنفس الاسم
+    if Department.query.filter_by(name=name).first():
+        flash('الإدارة موجودة بالفعل', 'error')
+        return redirect(url_for('admin_departments'))
+    
+    # إنشاء إدارة جديدة
+    department = Department(name=name)
+    db.session.add(department)
+    db.session.commit()
+    
+    flash('تم إضافة الإدارة بنجاح', 'success')
+    return redirect(url_for('admin_departments'))
+
+# مسار تعديل إدارة
+@app.route('/admin/departments/edit', methods=['POST'])
+@login_required('admin')
+def admin_edit_department():
+    """تعديل إدارة"""
+    department_id = request.form.get('department_id', type=int)
+    name = request.form.get('name')
+    
+    department = Department.query.get_or_404(department_id)
+    
+    # التحقق من عدم وجود إدارة أخرى بنفس الاسم
+    existing_department = Department.query.filter_by(name=name).first()
+    if existing_department and existing_department.id != department_id:
+        flash('يوجد إدارة أخرى بنفس الاسم', 'error')
+        return redirect(url_for('admin_departments'))
+    
+    # تحديث اسم الإدارة
+    department.name = name
+    db.session.commit()
+    
+    flash('تم تحديث الإدارة بنجاح', 'success')
+    return redirect(url_for('admin_departments'))
+
+# مسار حذف إدارة
+@app.route('/admin/departments/delete', methods=['POST'])
+@login_required('admin')
+def admin_delete_department():
+    """حذف إدارة"""
+    department_id = request.form.get('department_id', type=int)
+    
+    department = Department.query.get_or_404(department_id)
+    
+    # حذف الإدارة (سيتم حذف جميع الأقسام والبلاغات المرتبطة بها تلقائيًا بسبب cascade)
+    db.session.delete(department)
+    db.session.commit()
+    
+    flash('تم حذف الإدارة بنجاح', 'success')
+    return redirect(url_for('admin_departments'))
+
+# مسار إضافة قسم
+@app.route('/admin/sections/add', methods=['POST'])
+@login_required('admin')
+def admin_add_section():
+    """إضافة قسم جديد"""
+    department_id = request.form.get('department_id', type=int)
+    name = request.form.get('name')
+    
+    # التحقق من وجود الإدارة
+    department = Department.query.get_or_404(department_id)
+    
+    # التحقق من عدم وجود قسم بنفس الاسم للإدارة نفسها
+    existing_section = Section.query.filter_by(name=name, department_id=department_id).first()
+    if existing_section:
+        flash('القسم موجود بالفعل', 'error')
+        return redirect(url_for('admin_departments'))
+    
+    # إنشاء قسم جديد
+    section = Section(name=name, department_id=department_id)
+    db.session.add(section)
+    db.session.commit()
+    
+    flash('تم إضافة القسم بنجاح', 'success')
+    return redirect(url_for('admin_departments'))
+
+# مسار تعديل قسم
+@app.route('/admin/sections/edit', methods=['POST'])
+@login_required('admin')
+def admin_edit_section():
+    """تعديل قسم"""
+    section_id = request.form.get('section_id', type=int)
+    name = request.form.get('name')
+    
+    section = Section.query.get_or_404(section_id)
+    
+    # التحقق من عدم وجود قسم آخر بنفس الاسم للإدارة نفسها
+    existing_section = Section.query.filter_by(name=name, department_id=section.department_id).first()
+    if existing_section and existing_section.id != section_id:
+        flash('يوجد قسم آخر بنفس الاسم', 'error')
+        return redirect(url_for('admin_departments'))
+    
+    # تحديث اسم القسم
+    section.name = name
+    db.session.commit()
+    
+    flash('تم تحديث القسم بنجاح', 'success')
+    return redirect(url_for('admin_departments'))
+
+# مسار حذف قسم
+@app.route('/admin/sections/delete', methods=['POST'])
+@login_required('admin')
+def admin_delete_section():
+    """حذف قسم"""
+    section_id = request.form.get('section_id', type=int)
+    
+    section = Section.query.get_or_404(section_id)
+    
+    # نقل البلاغات من القسم إلى الإدارة الرئيسية
+    if section.tickets.count() > 0:
+        for ticket in section.tickets:
+            ticket.section_id = None
+        db.session.flush()
+    
+    # حذف القسم
+    db.session.delete(section)
+    db.session.commit()
+    
+    flash('تم حذف القسم بنجاح', 'success')
+    return redirect(url_for('admin_departments'))
+
+# مسار عرض المرفق
+@app.route('/attachments/<int:attachment_id>')
+@login_required()
+def view_attachment(attachment_id):
+    """عرض المرفق"""
+    attachment = Attachment.query.get_or_404(attachment_id)
+    ticket = Ticket.query.get(attachment.ticket_id)
+    current_user = get_current_user()
+    
+    # التحقق من الصلاحيات - يمكن للمدير ولفني الصيانة المسؤول وللموظف صاحب البلاغ عرض المرفقات
+    if (current_user.user_type != 'admin' and
+        current_user.id != ticket.created_by_id and
+        (current_user.user_type != 'maintenance' or current_user.id != ticket.assigned_to_id)):
+        flash('ليس لديك صلاحية لعرض هذا المرفق', 'error')
+        return redirect(url_for('index'))
+    
+    # التحقق مما إذا كان المستخدم يريد تحميل الملف أو معاينته
+    download = request.args.get('download', 'false') == 'true'
+    
+    try:
+        # إرسال الملف
+        return send_file(
+            attachment.file_path,
+            as_attachment=download,  # True للتحميل، False للمعاينة
+            download_name=attachment.filename if download else None,
+            mimetype=attachment.file_type
+        )
+    except Exception as e:
+        app.logger.error(f"Error serving attachment: {str(e)}")
+        flash('حدث خطأ أثناء محاولة عرض المرفق', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket.id))
+
+
+@app.route('/attachment/<int:attachment_id>/delete', methods=['POST'])
+@login_required()
+def delete_attachment(attachment_id):
+    """حذف المرفق"""
+    attachment = Attachment.query.get_or_404(attachment_id)
+    current_user = get_current_user()
+    
+    # التحقق من صلاحية حذف المرفق (المدير أو الشخص الذي قام برفع الملف)
+    if current_user.user_type != 'admin' and current_user.id != attachment.user_id:
+        flash('ليس لديك صلاحية لحذف هذا المرفق', 'error')
+        return redirect(url_for('view_ticket', ticket_id=attachment.ticket_id))
+    
+    # حذف الملف من النظام
+    try:
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], attachment.stored_filename)
+        if os.path.exists(file_path):
+            os.remove(file_path)
+    except Exception as e:
+        app.logger.error(f"خطأ في حذف الملف: {str(e)}")
+    
+    # حذف المرفق من قاعدة البيانات
+    ticket_id = attachment.ticket_id
+    filename = attachment.filename
+    
+    db.session.delete(attachment)
+    db.session.commit()
+    
+    # إضافة تعليق تلقائي عن حذف المرفق
+    comment = Comment(
+        content=f'تم حذف مرفق: {filename}',
+        ticket_id=ticket_id,
+        user_id=current_user.id
+    )
+    db.session.add(comment)
+    db.session.commit()
+    
+    flash('تم حذف المرفق بنجاح', 'success')
+    return redirect(url_for('view_ticket', ticket_id=ticket_id))
+
+
+
 
 # تشغيل التطبيق
 if __name__ == '__main__':
