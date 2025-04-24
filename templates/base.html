@@ -20,14 +20,14 @@
     <!-- Favicon -->
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon.ico') }}" type="image/x-icon">
 </head>
-<body>
+<body class="d-flex flex-column min-vh-100">
     {% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}
     <!-- شريط التنقل -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm">
         <div class="container">
-            <a class="navbar-brand" href="{{ url_for('index') }}">
+            <a class="navbar-brand d-flex align-items-center" href="{{ url_for('index') }}">
                 <img src="{{ url_for('static', filename='images/logo.png') }}" alt="Fixltpro" width="30" height="30" class="d-inline-block align-text-top me-2">
-                نظام بلاغات الدعم الفني
+                <span>نظام بلاغات الدعم الفني</span>
             </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="تبديل التنقل">
                 <span class="navbar-toggler-icon"></span>
@@ -90,10 +90,11 @@
 
                 <!-- مربع البحث عن البلاغات برقم البلاغ -->
                 <form class="d-flex mx-auto me-2" action="{{ url_for('search_ticket') }}" method="GET">
-                    <input class="form-control me-2" type="search" name="ticket_id" placeholder="ابحث برقم البلاغ..." aria-label="بحث">
-                    <button class="btn btn-outline-light" type="submit"><i class="fas fa-search"></i></button>
+                    <div class="input-group">
+                        <input class="form-control" type="search" name="ticket_id" placeholder="ابحث برقم البلاغ..." aria-label="بحث">
+                        <button class="btn btn-light" type="submit"><i class="fas fa-search"></i></button>
+                    </div>
                 </form>
-
 
                 <ul class="navbar-nav">
                     {% if session.user_id %}
@@ -104,7 +105,7 @@
                                     {{ get_current_user().name }}
                                 {% endif %}
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end">
+                            <ul class="dropdown-menu dropdown-menu-end shadow">
                                 <li>
                                     <a class="dropdown-item" href="{{ url_for('profile') }}">
                                         <i class="fas fa-id-card me-2"></i>الملف الشخصي
@@ -120,7 +121,7 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('login') }}">
+                            <a class="nav-link btn btn-outline-light btn-sm ms-2" href="{{ url_for('login') }}">
                                 <i class="fas fa-sign-in-alt me-1"></i>تسجيل الدخول
                             </a>
                         </li>
@@ -135,7 +136,7 @@
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 {% for category, message in messages %}
-                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show">
+                    <div class="alert alert-{{ category if category != 'error' else 'danger' }} alert-dismissible fade show shadow-sm">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="إغلاق"></button>
                     </div>
@@ -146,37 +147,27 @@
     {% endif %}
     
     <!-- المحتوى الرئيسي -->
-    <main class="{% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}container mt-4{% endif %}">
+    <main class="{% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}container mt-4{% endif %} flex-grow-1">
         {% block content %}{% endblock %}
     </main>
 
     {% if request.endpoint != 'login' and request.endpoint != 'reset_password' and request.endpoint != 'reset_password_request' %}
     <!-- التذييل -->
-    <footer class="bg-light text-center text-muted py-3 mt-5">
+    <footer class="bg-light text-center text-muted py-3 mt-5 border-top">
         <div class="container">
             <div class="row">
-                <div class="col-md-4 mb-3 mb-md-0">
+                <div class="col-md-6 mb-3 mb-md-0">
                     <h5 class="mb-3">نظام بلاغات الدعم الفني</h5>
                     <p class="small">منصة متكاملة لإدارة وتتبع المشكلات التقنية داخل المؤسسة</p>
                 </div>
-                <div class="col-md-4 mb-3 mb-md-0">
-                    <h5 class="mb-3">روابط سريعة</h5>
-                    <ul class="list-unstyled small">
-                        <li><a href="{{ url_for('index') }}" class="text-muted text-decoration-none">الرئيسية</a></li>
-                        <li><a href="#" class="text-muted text-decoration-none">الدعم الفني</a></li>
-                        <li><a href="#" class="text-muted text-decoration-none">سياسة الخصوصية</a></li>
-                    </ul>
-                </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <h5 class="mb-3">تواصل معنا</h5>
-                    <ul class="list-unstyled small">
-                        <li><i class="fas fa-envelope me-2"></i><a href="mailto:Su2da2@gmail.com" class="text-muted text-decoration-none">Su2da2@gmail.com</a></li>
-                        <li><i class="fas fa-phone me-2"></i><a href="tel:+966557364973" class="text-muted text-decoration-none">+966 55 736 4973</a></li>
-                    </ul>
+                    <div class="d-flex justify-content-center">
+                        <div class="mx-2"><i class="fas fa-envelope me-2"></i><a href="mailto:su2da2@gmail.com" class="text-muted text-decoration-none">su2da2@gmail.com</a></div>
+                        <div class="mx-2"><i class="fas fa-phone me-2"></i><a href="tel:+966557364973" class="text-muted text-decoration-none">0557364973</a></div>
+                    </div>
                 </div>
             </div>
-            <hr>
-            <p class="mb-0 small">جميع الحقوق محفوظة &copy; <span id="current-year"></span> نظام بلاغات الدعم الفني</p>
         </div>
     </footer>
     {% endif %}
@@ -184,20 +175,22 @@
     <!-- JavaScript -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        // تعيين التاريخ الحالي في التذييل
         document.addEventListener('DOMContentLoaded', function() {
-            const now = new Date();
-            const currentYearElement = document.getElementById('current-year');
-            if (currentYearElement) {
-                currentYearElement.textContent = now.getFullYear();
-            }
-            
             // إضافة تأثير نشط للروابط في القائمة
             const currentPath = window.location.pathname;
             document.querySelectorAll('.navbar-nav .nav-link').forEach(link => {
                 if (link.getAttribute('href') === currentPath) {
                     link.classList.add('active');
                 }
+            });
+            
+            // إخفاء رسائل التنبيه تلقائيًا بعد 5 ثوان
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(alert => {
+                setTimeout(() => {
+                    const bsAlert = new bootstrap.Alert(alert);
+                    bsAlert.close();
+                }, 5000);
             });
         });
     </script>

@@ -1,0 +1,87 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700&display=swap');
+
+body {
+    font-family: 'Tajawal', sans-serif;
+    background-color: #f8f9fa;
+    padding: 20px 0;
+}
+
+.setup-container {
+    max-width: 800px;
+    margin: 0 auto;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+}
+
+.setup-logo {
+    max-width: 150px;
+    height: auto;
+}
+
+.setup-header {
+    margin-bottom: 40px;
+}
+
+.setup-progress-container {
+    margin-bottom: 30px;
+}
+
+.progress {
+    height: 24px;
+    border-radius: 12px;
+}
+
+.setup-log-container {
+    margin-top: 20px;
+    margin-bottom: 30px;
+}
+
+.setup-log {
+    height: 200px;
+    overflow-y: auto;
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 5px;
+    padding: 10px;
+    font-family: monospace;
+    direction: ltr;
+}
+
+.log-entry {
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
+
+.log-entry.success {
+    background-color: rgba(40, 167, 69, 0.1);
+    border-right: 3px solid #28a745;
+}
+
+.log-entry.info {
+    background-color: rgba(13, 110, 253, 0.1);
+    border-right: 3px solid #0d6efd;
+}
+
+.log-entry.warning {
+    background-color: rgba(255, 193, 7, 0.1);
+    border-right: 3px solid #ffc107;
+}
+
+.log-entry.error {
+    background-color: rgba(220, 53, 69, 0.1);
+    border-right: 3px solid #dc3545;
+}
+
+.setup-complete, .setup-error {
+    padding: 20px;
+    border-radius: 5px;
+}
+
+.setup-spinner {
+    width: 20px;
+    height: 20px;
+    margin-left: 10px;
+}

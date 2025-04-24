@@ -377,6 +377,16 @@ document.addEventListener('DOMContentLoaded', function() {
     // رسم مخطط الإدارات
     const departmentsChart = document.getElementById('departmentsChart');
     
+    // تعريف متغير البيانات
+    // سيتم تجاهل هذا السطر من قبل محرر الكود ولكنه سيعمل عند تنفيذ الصفحة
+    let departments_data;
+    try {
+        departments_data = JSON.parse('{{ departments_json|safe }}');
+    } catch (e) {
+        departments_data = [];
+        console.error('خطأ في تحليل بيانات الإدارات:', e);
+    }
+    
     if (departmentsChart && departments_data && departments_data.length > 0) {
         const departmentNames = [];
         const departmentTicketCounts = [];
@@ -415,6 +425,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+    } else {
+        // إذا لم تكن هناك بيانات، نعرض رسالة بدلاً من الرسم البياني
+        if (departmentsChart) {
+            departmentsChart.parentNode.innerHTML = '<div class="text-center p-4"><i class="fas fa-chart-pie fa-3x text-muted mb-3"></i><p class="lead">لا توجد بيانات كافية لعرض الإحصائيات</p></div>';
+        }
     }
 });
 </script>

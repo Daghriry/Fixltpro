@@ -5,7 +5,7 @@
 Fixltpro - نظام بلاغات الدعم الفني - تطبيق Flask مع SQLite
 """
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, jsonify, make_response
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import CSRFProtect  # إضافة حماية CSRF
 from flask_wtf import FlaskForm  # استيراد FlaskForm
@@ -254,19 +254,39 @@ def get_current_user():
     return None
 
 
-# مسارات التطبيق
+
 @app.route('/')
 def index():
     """الصفحة الرئيسية"""
+    # التحقق من وجود جداول قاعدة البيانات
+    try:
+        if User.query.count() == 0:
+            # قاعدة البيانات موجودة لكن فارغة، إعادة توجيه إلى الإعداد
+            return redirect(url_for('setup_page'))
+    except:
+        # خطأ يعني عدم وجود جداول في قاعدة البيانات
+        session.clear()  # حذف بيانات الجلسة
+        return redirect(url_for('setup_page'))
+        
+    # في حالة وجود جلسة تسجيل دخول
     if 'user_id' in session:
-        user = User.query.get(session['user_id'])
-        if user.user_type == 'admin':
-            return redirect(url_for('admin_dashboard'))
-        elif user.user_type == 'maintenance':
-            return redirect(url_for('maintenance_dashboard'))
-        else:
-            return redirect(url_for('create_ticket'))
-    
+        try:
+            user = User.query.get(session['user_id'])
+            if user:  # تأكد من أن المستخدم موجود
+                if user.user_type == 'admin':
+                    return redirect(url_for('admin_dashboard'))
+                elif user.user_type == 'maintenance':
+                    return redirect(url_for('maintenance_dashboard'))
+                else:
+                    return redirect(url_for('create_ticket'))
+            else:
+                # المستخدم غير موجود، مسح الجلسة
+                session.clear()
+        except:
+            # خطأ في الاستعلام، مسح الجلسة
+            session.clear()
+            
+    # إعادة توجيه إلى صفحة تسجيل الدخول
     return redirect(url_for('login'))
 
 
@@ -415,7 +435,6 @@ def assign_ticket(ticket_id):
 
 
 
-# تعديل مسار إنشاء البلاغ
 @app.route('/ticket/create', methods=['GET', 'POST'])
 @login_required('employee')
 def create_ticket():
@@ -506,7 +525,7 @@ def create_ticket():
         )
         
         db.session.add(ticket)
-        db.session.commit()
+        db.session.flush()  # للحصول على معرف البلاغ
         
         # معالجة المرفقات
         uploaded_files = request.files.getlist('attachments')
@@ -548,14 +567,31 @@ def create_ticket():
         db.session.commit()
         
         flash('تم إنشاء البلاغ بنجاح', 'success')
-        return redirect(url_for('view_ticket', ticket_id=ticket.id))
+        
+        # إعادة التوجيه مع تعليمات لمنع تخزين البيانات في المتصفح
+        response = make_response(redirect(url_for('view_ticket', ticket_id=ticket.id)))
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '-1'
+        
+        # تعيين كوكي لمسح البيانات بعد الانتقال
+        response.set_cookie('clear_form', 'true', max_age=60)
+        
+        return response
     
-    return render_template('create_ticket.html', 
+    # في حالة طلب GET، تأكد من تقديم نموذج نظيف
+    response = make_response(render_template('create_ticket.html', 
                           categories=categories, 
                           priorities=priorities, 
                           departments=departments,
-                          maintenance_staff=maintenance_staff)
-
+                          maintenance_staff=maintenance_staff))
+    
+    # إضافة ترويسات التحكم بالتخزين المؤقت
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '-1'
+    
+    return response
 
 
 @app.route('/search_ticket')
@@ -725,153 +761,213 @@ def maintenance_dashboard():
 
 
 @app.route('/setup')
-def setup_database():
-    """إعداد قاعدة البيانات وإنشاء البيانات الأولية"""
-    # إنشاء الجداول
-    db.create_all()
+def setup_page():
+    """صفحة إعداد قاعدة البيانات"""
+    # مسح أي جلسة سابقة لتجنب الأخطاء
+    session.clear()
     
-    # التحقق مما إذا كانت البيانات موجودة بالفعل
-    if User.query.count() > 0:
-        flash('تم إعداد قاعدة البيانات مسبقاً', 'info')
-        return redirect(url_for('index'))
+    # التحقق مما إذا كانت قاعدة البيانات مهيأة بالفعل
+    try:
+        if User.query.count() > 0:
+            flash('تم إعداد قاعدة البيانات مسبقاً', 'info')
+            return redirect(url_for('login'))
+    except:
+        # تجاهل الخطأ - إنه متوقع إذا لم تكن الجداول موجودة بعد
+        pass
     
-    # إنشاء مجلد التحميلات إذا لم يكن موجودًا
-    upload_dir = os.path.join(basedir, 'uploads')
-    if not os.path.exists(upload_dir):
-        os.makedirs(upload_dir)
-    
-    # إنشاء المستخدمين
-    admin = User(username='admin', name='مدير النظام', user_type='admin', email='admin@fixltpro.com', phone='0500000000')
-    admin.password = 'admin123'
-    
-    employee1 = User(username='employee1', name='موظف الاستقبال', user_type='employee', email='employee@fixltpro.com', phone='0500000001')
-    employee1.password = 'employee1'
-    
-    maintenance1 = User(username='maintenance1', name='فني الصيانة 1', user_type='maintenance', email='maint1@fixltpro.com', phone='0500000002')
-    maintenance1.password = 'maintenance1'
-    
-    maintenance2 = User(username='maintenance2', name='فني الصيانة 2', user_type='maintenance', email='maint2@fixltpro.com', phone='0500000003')
-    maintenance2.password = 'maintenance2'
-    
-    db.session.add_all([admin, employee1, maintenance1, maintenance2])
-    
-    # إنشاء الأولويات
-    high_priority = TicketPriority(name='عالية', response_time=24, color='#FF0000')
-    medium_priority = TicketPriority(name='متوسطة', response_time=72, color='#FFAA00')
-    low_priority = TicketPriority(name='منخفضة', response_time=120, color='#00AA00')
-    
-    db.session.add_all([high_priority, medium_priority, low_priority])
-    
-    # إنشاء الحالات
-    new_status = TicketStatus(name='جديد')
-    in_progress = TicketStatus(name='قيد المعالجة')
-    completed = TicketStatus(name='مكتمل')
-    closed = TicketStatus(name='مغلق')
-    
-    db.session.add_all([new_status, in_progress, completed, closed])
-    
-    # إنشاء التصنيفات
-    hardware = Category(name='أجهزة الحاسب')
-    network = Category(name='شبكات')
-    software = Category(name='برمجيات')
-    other = Category(name='أخرى')
-    
-    db.session.add_all([hardware, network, software, other])
-    
-    # إنشاء التصنيفات الفرعية
-    hardware_subcats = [
-        SubCategory(name='أجهزة الحاسب المكتبية', category_id=1),
-        SubCategory(name='أجهزة الحاسب المحمولة', category_id=1),
-        SubCategory(name='الطابعات', category_id=1),
-        SubCategory(name='أجهزة العرض', category_id=1)
-    ]
-    
-    network_subcats = [
-        SubCategory(name='الإنترنت', category_id=2),
-        SubCategory(name='الشبكة الداخلية', category_id=2),
-        SubCategory(name='نقاط الوصول اللاسلكية', category_id=2)
-    ]
-    
-    software_subcats = [
-        SubCategory(name='نظام التشغيل', category_id=3),
-        SubCategory(name='برامج المكتب', category_id=3),
-        SubCategory(name='تطبيقات المؤسسة', category_id=3),
-        SubCategory(name='البرامج المضادة للفيروسات', category_id=3)
-    ]
-    
-    db.session.add_all(hardware_subcats + network_subcats + software_subcats)
-    
-    # إنشاء الإدارات
-    dept1 = Department(name='الإدارة العامة')
-    dept2 = Department(name='الموارد البشرية')
-    dept3 = Department(name='المالية')
-    dept4 = Department(name='تقنية المعلومات')
-    
-    db.session.add_all([dept1, dept2, dept3, dept4])
-    db.session.flush()
-    
-    # إنشاء الأقسام
-    sections = [
-        Section(name='مكتب المدير العام', department_id=dept1.id),
-        Section(name='العلاقات العامة', department_id=dept1.id),
-        Section(name='التوظيف', department_id=dept2.id),
-        Section(name='التطوير الوظيفي', department_id=dept2.id),
-        Section(name='المحاسبة', department_id=dept3.id),
-        Section(name='المشتريات', department_id=dept3.id),
-        Section(name='الدعم الفني', department_id=dept4.id),
-        Section(name='البنية التحتية', department_id=dept4.id),
-        Section(name='تطوير البرمجيات', department_id=dept4.id)
-    ]
-    
-    db.session.add_all(sections)
-    
-    # حفظ التغييرات
-    db.session.commit()
-    
-    # إنشاء بعض البلاغات التجريبية
-    ticket1 = Ticket(
-        title='جهاز لا يعمل',
-        description='جهاز الحاسب في قسم المحاسبة لا يعمل بشكل صحيح',
-        created_by_id=employee1.id,
-        category_id=hardware.id,
-        subcategory_id=hardware_subcats[0].id,  # أجهزة الحاسب المكتبية
-        department_id=dept3.id,  # المالية
-        section_id=sections[4].id,  # المحاسبة
-        priority_id=high_priority.id,
-        status_id=new_status.id,
-        due_date=datetime.utcnow() + timedelta(hours=24)
-    )
-    
-    ticket2 = Ticket(
-        title='انقطاع في الشبكة',
-        description='شبكة الإنترنت غير متوفرة في الطابق الثاني',
-        created_by_id=employee1.id,
-        category_id=network.id,
-        subcategory_id=network_subcats[0].id,  # الإنترنت
-        department_id=dept4.id,  # تقنية المعلومات
-        section_id=sections[7].id,  # البنية التحتية
-        priority_id=medium_priority.id,
-        status_id=new_status.id,
-        due_date=datetime.utcnow() + timedelta(hours=72)
-    )
-    
-    db.session.add_all([ticket1, ticket2])
-    db.session.commit()
-    
-    flash('تم إعداد قاعدة البيانات بنجاح', 'success')
-    return redirect(url_for('index'))
+    # عرض صفحة الإعداد
+    return render_template('setup_page.html')
 
-# تعديل الـ context processor لإضافة متغيرات جديدة
+
+def setup_api():
+    """واجهة برمجة التطبيقات لإعداد قاعدة البيانات"""
+    try:
+        # مسح أي جلسة سابقة
+        session.clear()
+        
+        # التحقق مما إذا كانت البيانات موجودة بالفعل
+        try:
+            if User.query.count() > 0:
+                return jsonify({'status': 'info', 'message': 'تم إعداد قاعدة البيانات مسبقاً'})
+        except:
+            # تجاهل الخطأ - هذا متوقع إذا لم تكن الجداول موجودة
+            pass
+        
+        # إعادة إنشاء قاعدة البيانات
+        try:
+            db.drop_all()  # حذف جميع الجداول القديمة إن وجدت
+        except:
+            pass  # تجاهل الخطأ إذا لم تكن هناك جداول لحذفها
+            
+        db.create_all()  # إنشاء الجداول من جديد
+        
+        # إنشاء مجلد التحميلات إذا لم يكن موجودًا
+        upload_dir = os.path.join(basedir, 'uploads')
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+        
+        # إنشاء المستخدمين
+        admin = User(username='admin', name='مدير النظام', user_type='admin', email='admin@fixltpro.com', phone='0500000000')
+        admin.password = 'admin123'
+        
+        employee1 = User(username='employee1', name='موظف الاستقبال', user_type='employee', email='employee@fixltpro.com', phone='0500000001')
+        employee1.password = 'employee1'
+        
+        maintenance1 = User(username='maintenance1', name='فني الصيانة 1', user_type='maintenance', email='maint1@fixltpro.com', phone='0500000002')
+        maintenance1.password = 'maintenance1'
+        
+        maintenance2 = User(username='maintenance2', name='فني الصيانة 2', user_type='maintenance', email='maint2@fixltpro.com', phone='0500000003')
+        maintenance2.password = 'maintenance2'
+        
+        db.session.add_all([admin, employee1, maintenance1, maintenance2])
+        db.session.flush()
+        
+        # إنشاء الأولويات
+        high_priority = TicketPriority(name='عالية', response_time=24, color='#FF0000')
+        medium_priority = TicketPriority(name='متوسطة', response_time=72, color='#FFAA00')
+        low_priority = TicketPriority(name='منخفضة', response_time=120, color='#00AA00')
+        
+        db.session.add_all([high_priority, medium_priority, low_priority])
+        db.session.flush()
+        
+        # إنشاء الحالات
+        new_status = TicketStatus(name='جديد')
+        in_progress = TicketStatus(name='قيد المعالجة')
+        completed = TicketStatus(name='مكتمل')
+        closed = TicketStatus(name='مغلق')
+        
+        db.session.add_all([new_status, in_progress, completed, closed])
+        db.session.flush()
+        
+        # إنشاء التصنيفات
+        hardware = Category(name='أجهزة الحاسب')
+        network = Category(name='شبكات')
+        software = Category(name='برمجيات')
+        other = Category(name='أخرى')
+        
+        db.session.add_all([hardware, network, software, other])
+        db.session.flush()
+        
+        # إنشاء التصنيفات الفرعية
+        hardware_subcats = [
+            SubCategory(name='أجهزة الحاسب المكتبية', category_id=hardware.id),
+            SubCategory(name='أجهزة الحاسب المحمولة', category_id=hardware.id),
+            SubCategory(name='الطابعات', category_id=hardware.id),
+            SubCategory(name='أجهزة العرض', category_id=hardware.id)
+        ]
+        
+        network_subcats = [
+            SubCategory(name='الإنترنت', category_id=network.id),
+            SubCategory(name='الشبكة الداخلية', category_id=network.id),
+            SubCategory(name='نقاط الوصول اللاسلكية', category_id=network.id)
+        ]
+        
+        software_subcats = [
+            SubCategory(name='نظام التشغيل', category_id=software.id),
+            SubCategory(name='برامج المكتب', category_id=software.id),
+            SubCategory(name='تطبيقات المؤسسة', category_id=software.id),
+            SubCategory(name='البرامج المضادة للفيروسات', category_id=software.id)
+        ]
+        
+        db.session.add_all(hardware_subcats + network_subcats + software_subcats)
+        db.session.flush()
+        
+        # إنشاء الإدارات
+        dept1 = Department(name='الإدارة العامة')
+        dept2 = Department(name='الموارد البشرية')
+        dept3 = Department(name='المالية')
+        dept4 = Department(name='تقنية المعلومات')
+        
+        db.session.add_all([dept1, dept2, dept3, dept4])
+        db.session.flush()
+        
+        # إنشاء الأقسام
+        sections = [
+            Section(name='مكتب المدير العام', department_id=dept1.id),
+            Section(name='العلاقات العامة', department_id=dept1.id),
+            Section(name='التوظيف', department_id=dept2.id),
+            Section(name='التطوير الوظيفي', department_id=dept2.id),
+            Section(name='المحاسبة', department_id=dept3.id),
+            Section(name='المشتريات', department_id=dept3.id),
+            Section(name='الدعم الفني', department_id=dept4.id),
+            Section(name='البنية التحتية', department_id=dept4.id),
+            Section(name='تطوير البرمجيات', department_id=dept4.id)
+        ]
+        
+        db.session.add_all(sections)
+        db.session.flush()
+        
+        # حفظ التغييرات
+        db.session.commit()
+        
+        # إنشاء بعض البلاغات التجريبية
+        ticket1 = Ticket(
+            title='جهاز لا يعمل',
+            description='جهاز الحاسب في قسم المحاسبة لا يعمل بشكل صحيح',
+            created_by_id=employee1.id,
+            category_id=hardware.id,
+            subcategory_id=hardware_subcats[0].id,  # أجهزة الحاسب المكتبية
+            department_id=dept3.id,  # المالية
+            section_id=sections[4].id,  # المحاسبة
+            priority_id=high_priority.id,
+            status_id=new_status.id,
+            due_date=datetime.utcnow() + timedelta(hours=24)
+        )
+        
+        ticket2 = Ticket(
+            title='انقطاع في الشبكة',
+            description='شبكة الإنترنت غير متوفرة في الطابق الثاني',
+            created_by_id=employee1.id,
+            category_id=network.id,
+            subcategory_id=network_subcats[0].id,  # الإنترنت
+            department_id=dept4.id,  # تقنية المعلومات
+            section_id=sections[7].id,  # البنية التحتية
+            priority_id=medium_priority.id,
+            status_id=new_status.id,
+            due_date=datetime.utcnow() + timedelta(hours=72)
+        )
+        
+        db.session.add_all([ticket1, ticket2])
+        db.session.commit()
+        
+        return jsonify({'status': 'success', 'message': 'تم إعداد قاعدة البيانات بنجاح'})
+        
+    except Exception as e:
+        app.logger.error(f"خطأ في إعداد قاعدة البيانات: {str(e)}")
+        return jsonify({'status': 'error', 'message': f'حدث خطأ أثناء إعداد قاعدة البيانات: {str(e)}'})
+
+
 @app.context_processor
 def inject_common_data():
     """إضافة بيانات مشتركة إلى جميع القوالب"""
-    return {
-        'get_current_user': get_current_user,
-        'now': datetime.now(),
-        'categories': Category.query.all(),
-        'departments': Department.query.all()
-    }
+    try:
+        # نحاول الحصول على البيانات من قاعدة البيانات
+        data = {
+            'get_current_user': get_current_user,
+            'now': datetime.now()
+        }
+        
+        # التحقق من طريق المتصفح - إذا كان مسار الإعداد، لا نحتاج لبيانات قاعدة البيانات
+        if request.path != '/setup' and request.path != '/setup_api':
+            data['categories'] = Category.query.all()
+            data['departments'] = Department.query.all()
+        
+        return data
+    except:
+        # في حالة وجود خطأ (مثل عدم وجود الجداول)، نعيد فقط البيانات الأساسية
+        return {
+            'get_current_user': get_current_user,
+            'now': datetime.now(),
+            'categories': [],
+            'departments': []
+        }
 
+
+@app.route('/setup_api', methods=['POST'])
+@csrf.exempt  # إعفاء هذا المسار من حماية CSRF
+def setup_api_route():
+    """مسار واجهة برمجة التطبيقات لإعداد قاعدة البيانات"""
+    return setup_api()
 
 # إضافة دالة لتوفير المستخدم الحالي في قوالب الصفحات
 @app.context_processor
