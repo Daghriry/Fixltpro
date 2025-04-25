@@ -3,60 +3,97 @@
 {% block content %}
 <h2 class="mb-4">لوحة تحكم فني الصيانة</h2>
 
-<!-- بطاقات الإحصائيات -->
+<!-- بطاقات الإحصائيات حسب الحالة -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card h-100 bg-primary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">عدد البلاغات</h5>
+                <h2 class="display-4 mb-0">{{ total_assigned }}</h2>
+                <p class="mb-0">إجمالي البلاغات المسندة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-success text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">البلاغات الجديدة</h5>
+                <h2 class="display-4 mb-0">{{ new_tickets|length }}</h2>
+                <p class="mb-0">بلاغات جديدة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-warning text-dark">
+            <div class="card-body text-center">
+                <h5 class="card-title">قيد المعالجة</h5>
+                <h2 class="display-4 mb-0">{{ in_progress_tickets|length }}</h2>
+                <p class="mb-0">بلاغات قيد المعالجة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-info text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">مكتمل</h5>
+                <h2 class="display-4 mb-0">{{ completed_tickets|length }}</h2>
+                <p class="mb-0">بلاغات مكتملة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-secondary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">مغلق</h5>
+                <h2 class="display-4 mb-0">{{ closed_tickets|default(0) }}</h2>
+                <p class="mb-0">بلاغات مغلقة</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- بطاقات الإحصائيات حسب الأولوية -->
 <div class="row mb-4">
     <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">إجمالي البلاغات</h6>
-                        <h2 class="mb-0">{{ total_assigned }}</h2>
-                    </div>
-                    <i class="fas fa-ticket-alt fa-3x opacity-50"></i>
-                </div>
+        <div class="card h-100 bg-danger text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">عالية</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.high|default(0) }}</h2>
+                <p class="mb-0">أولوية عالية</p>
             </div>
         </div>
     </div>
     
     <div class="col-md-3">
-        <div class="card bg-danger text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">بلاغات جديدة</h6>
-                        <h2 class="mb-0">{{ new_tickets|length }}</h2>
-                    </div>
-                    <i class="fas fa-exclamation-circle fa-3x opacity-50"></i>
-                </div>
+        <div class="card h-100" style="background-color: #e67e22; color: white;">
+            <div class="card-body text-center">
+                <h5 class="card-title">متوسطة</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.medium|default(0) }}</h2>
+                <p class="mb-0">أولوية متوسطة</p>
             </div>
         </div>
     </div>
     
     <div class="col-md-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">قيد المعالجة</h6>
-                        <h2 class="mb-0">{{ in_progress_tickets|length }}</h2>
-                    </div>
-                    <i class="fas fa-tools fa-3x opacity-50"></i>
-                </div>
+        <div class="card h-100" style="background-color: #f1c40f; color: black;">
+            <div class="card-body text-center">
+                <h5 class="card-title">منخفضة</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.low|default(0) }}</h2>
+                <p class="mb-0">أولوية منخفضة</p>
             </div>
         </div>
     </div>
     
     <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">مكتملة</h6>
-                        <h2 class="mb-0">{{ completed_tickets|length }}</h2>
-                    </div>
-                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
-                </div>
+        <div class="card h-100" style="background-color: #16a085; color: white;">
+            <div class="card-body text-center">
+                <h5 class="card-title">محدد بوقت</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.custom|default(0) }}</h2>
+                <p class="mb-0">أولوية بوقت محدد</p>
             </div>
         </div>
     </div>
@@ -76,9 +113,9 @@
 
 <!-- البلاغات الجديدة -->
 <div class="card mb-4">
-    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-exclamation-circle me-2"></i>بلاغات جديدة</h5>
-        <span class="badge bg-light text-danger">{{ new_tickets|length }}</span>
+        <span class="badge bg-light text-success">{{ new_tickets|length }}</span>
     </div>
     <div class="card-body p-0">
         {% if new_tickets %}
@@ -206,9 +243,9 @@
 
 <!-- البلاغات المكتملة -->
 <div class="card">
-    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
         <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>البلاغات المكتملة</h5>
-        <span class="badge bg-light text-success">{{ completed_tickets|length }}</span>
+        <span class="badge bg-light text-info">{{ completed_tickets|length }}</span>
     </div>
     <div class="card-body p-0">
         {% if completed_tickets %}

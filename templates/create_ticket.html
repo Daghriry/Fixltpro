@@ -59,10 +59,21 @@
                                 {% for priority in priorities %}
                                 <option value="{{ priority.id }}">{{ priority.name }} ({{ priority.response_time }} ساعة)</option>
                                 {% endfor %}
+                                <option value="0">بوقت محدد</option>
                             </select>
                         </div>
                         
-                        <div class="col-md-6">
+                        <div class="col-md-6" id="custom_priority_container" style="display: none;">
+                            <label for="custom_priority" class="form-label">خلال كم يوم</label>
+                            <select class="form-select" id="custom_priority" name="custom_priority">
+                                <option value="" selected disabled>-- اختر عدد الأيام --</option>
+                                {% for day in range(1, 31) %}
+                                <option value="{{ day }}">{{ day }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6" id="maintenance_container">
                             <label for="assigned_to_id" class="form-label">تعيين إلى فني الصيانة</label>
                             <select class="form-select" id="assigned_to_id" name="assigned_to_id">
                                 <option value="" selected disabled>-- اختر فني الصيانة --</option>
@@ -118,4 +129,31 @@
 
 {% block scripts %}
 <script src="{{ url_for('static', filename='js/create_ticket.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const prioritySelect = document.getElementById('priority_id');
+    const customPriorityContainer = document.getElementById('custom_priority_container');
+    const customPrioritySelect = document.getElementById('custom_priority');
+    const maintenanceContainer = document.getElementById('maintenance_container');
+    
+    // دالة لاظهار/اخفاء حقل الوقت المخصص
+    function toggleCustomPriority() {
+        if (prioritySelect.value === "0") {
+            customPriorityContainer.style.display = "block";
+            customPrioritySelect.setAttribute('required', 'required');
+            maintenanceContainer.className = "col-md-6 mt-3";
+        } else {
+            customPriorityContainer.style.display = "none";
+            customPrioritySelect.removeAttribute('required');
+            maintenanceContainer.className = "col-md-6";
+        }
+    }
+    
+    // تطبيق التغييرات عند تغيير الأولوية
+    prioritySelect.addEventListener('change', toggleCustomPriority);
+    
+    // التطبيق الأولي عند تحميل الصفحة
+    toggleCustomPriority();
+});
+</script>
 {% endblock %}

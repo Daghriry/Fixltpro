@@ -3,65 +3,131 @@
 {% block content %}
 <h2 class="mb-4">لوحة تحكم الإدارة</h2>
 
-<!-- بطاقات الإحصائيات -->
+<style>
+    /* أنماط خاصة لبطاقات الأولويات */
+    .priority-badge[data-priority="عالية"] {
+        background-color: #e74a3b !important;
+        color: white !important;
+    }
+    
+    .priority-badge[data-priority="متوسطة"] {
+        background-color: #f6c23e !important;
+        color: black !important;
+    }
+    
+    .priority-badge[data-priority="منخفضة"] {
+        background-color: #1cc88a !important;
+        color: white !important;
+    }
+    
+    .priority-badge[data-priority="بوقت محدد"] {
+        background-color: #16a085 !important;
+        color: white !important;
+    }
+    
+    /* تنسيق لظهور النص بشكل أفضل في البطاقات */
+    .priority-badge {
+        font-weight: bold;
+        padding: 5px 8px;
+        border-radius: 4px;
+    }
+</style>
+
+<!-- بطاقات الإحصائيات حسب الحالة -->
 <div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">إجمالي البلاغات</h6>
-                        <h2 class="mb-0">{{ total_tickets }}</h2>
-                    </div>
-                    <i class="fas fa-ticket-alt fa-3x opacity-50"></i>
-                </div>
+    <div class="col">
+        <div class="card h-100 bg-primary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">عدد البلاغات</h5>
+                <h2 class="display-4 mb-0">{{ total_tickets }}</h2>
+                <p class="mb-0">إجمالي البلاغات في النظام</p>
             </div>
         </div>
     </div>
     
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">البلاغات المفتوحة</h6>
-                        <h2 class="mb-0">{{ open_tickets }}</h2>
-                    </div>
-                    <i class="fas fa-clock fa-3x opacity-50"></i>
-                </div>
+    <div class="col">
+        <div class="card h-100 bg-success text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">البلاغات الجديدة</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.new|default(0) }}</h2>
+                <p class="mb-0">بلاغات بحالة جديد</p>
             </div>
         </div>
     </div>
     
-    <div class="col-md-3">
-        <div class="card bg-danger text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">أولوية عالية</h6>
-                        <h2 class="mb-0">{{ high_priority }}</h2>
-                    </div>
-                    <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
-                </div>
+    <div class="col">
+        <div class="card h-100 bg-warning text-dark">
+            <div class="card-body text-center">
+                <h5 class="card-title">قيد المعالجة</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.in_progress|default(0) }}</h2>
+                <p class="mb-0">بلاغات قيد المعالجة</p>
             </div>
         </div>
     </div>
     
-    <div class="col-md-3">
-        <div class="card bg-success text-white">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">مكتملة</h6>
-                        <h2 class="mb-0">{{ completed_tickets }}</h2>
-                    </div>
-                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
-                </div>
+    <div class="col">
+        <div class="card h-100 bg-info text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">مكتمل</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.completed|default(0) }}</h2>
+                <p class="mb-0">بلاغات مكتملة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-secondary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">مغلق</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.closed|default(0) }}</h2>
+                <p class="mb-0">بلاغات مغلقة</p>
             </div>
         </div>
     </div>
 </div>
 
+<!-- بطاقات الإحصائيات حسب الأولوية -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card h-100 bg-danger text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">عالية</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.high|default(0) }}</h2>
+                <p class="mb-0">أولوية عالية</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card h-100" style="background-color: #e67e22; color: white;">
+            <div class="card-body text-center">
+                <h5 class="card-title">متوسطة</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.medium|default(0) }}</h2>
+                <p class="mb-0">أولوية متوسطة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card h-100" style="background-color: #f1c40f; color: black;">
+            <div class="card-body text-center">
+                <h5 class="card-title">منخفضة</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.low|default(0) }}</h2>
+                <p class="mb-0">أولوية منخفضة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card h-100" style="background-color: #16a085; color: white;">
+            <div class="card-body text-center">
+                <h5 class="card-title">محدد بوقت</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.custom|default(0) }}</h2>
+                <p class="mb-0">أولوية بوقت محدد</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- تصفية البلاغات -->
 <div class="card mb-4">
@@ -134,24 +200,26 @@
                 </thead>
                 <tbody>
                     {% for ticket in tickets %}
-                    <tr class="
-                        {% if ticket.priority.name == 'عالية' %}priority-high
-                        {% elif ticket.priority.name == 'متوسطة' %}priority-medium
-                        {% elif ticket.priority.name == 'منخفضة' %}priority-low{% endif %}
-                    ">
+                    <tr>
                         <th scope="row">{{ ticket.id }}</th>
                         <td>{{ ticket.title }}</td>
                         <td>{{ ticket.category.name }}</td>
                         <td>
                             <span class="badge priority-badge" data-priority="{{ ticket.priority.name }}">
-                                {{ ticket.priority.name }}
+                                {% if "خلال" in ticket.priority.name %}
+                                    {{ ticket.priority.name }}
+                                {% elif ticket.priority.is_custom %}
+                                    بوقت محدد
+                                {% else %}
+                                    {{ ticket.priority.name }}
+                                {% endif %}
                             </span>
                         </td>
                         <td>
                             <span class="badge
-                                {% if ticket.status.name == 'جديد' %}bg-danger
+                                {% if ticket.status.name == 'جديد' %}bg-success
                                 {% elif ticket.status.name == 'قيد المعالجة' %}bg-warning text-dark
-                                {% elif ticket.status.name == 'مكتمل' %}bg-success
+                                {% elif ticket.status.name == 'مكتمل' %}bg-info
                                 {% elif ticket.status.name == 'مغلق' %}bg-secondary
                                 {% endif %}">
                                 {{ ticket.status.name }}
@@ -205,6 +273,7 @@
 </div>
 
 
+
 <!-- تحديث نافذة تعديل البلاغ -->
 <div class="modal fade" id="editTicketModal" tabindex="-1" aria-labelledby="editTicketModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
@@ -235,6 +304,18 @@
                             <select class="form-select" id="edit_priority_id" name="priority_id" required>
                                 {% for priority in priorities %}
                                 <option value="{{ priority.id }}">{{ priority.name }} ({{ priority.response_time }} ساعة)</option>
+                                {% endfor %}
+                                <option value="0">بوقت محدد</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6" id="edit_custom_priority_container" style="display: none;">
+                            <label for="edit_custom_priority" class="form-label">خلال كم يوم</label>
+                            <select class="form-select" id="edit_custom_priority" name="custom_priority">
+                                <option value="" selected disabled>-- اختر عدد الأيام --</option>
+                                {% for day in range(1, 31) %}
+                                <option value="{{ day }}">{{ day }}</option>
                                 {% endfor %}
                             </select>
                         </div>
@@ -293,52 +374,72 @@
 
 {% block scripts %}
 <script type="text/javascript">
-document.addEventListener('DOMContentLoaded', function() {
-    // تطبيق ألوان الأولويات ديناميكيًا
-    document.querySelectorAll('.priority-badge').forEach(badge => {
-        const priority = badge.getAttribute('data-priority');
-        if (priorityColors[priority]) {
-            badge.style.backgroundColor = priorityColors[priority];
+    document.addEventListener('DOMContentLoaded', function() {
+        // تطبيق ألوان الأولويات ديناميكيًا
+        document.querySelectorAll('.priority-badge').forEach(badge => {
+            const priority = badge.getAttribute('data-priority');
+            // نستخدم CSS المحدد بدلاً من الألوان الديناميكية لضمان تناسق الألوان والنص
+            // تم تحديد الألوان والنص في CSS
+        });
+    
+        // تعبئة بيانات البلاغ في نافذة التعديل
+        const editButtons = document.querySelectorAll('.edit-ticket-btn');
+        editButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const ticketId = this.getAttribute('data-id');
+                const ticketTitle = this.getAttribute('data-title');
+                const ticketDescription = this.getAttribute('data-description');
+                const ticketCategory = this.getAttribute('data-category');
+                const ticketPriority = this.getAttribute('data-priority');
+                
+                document.getElementById('edit_ticket_id').value = ticketId;
+                document.getElementById('edit_title').value = ticketTitle;
+                document.getElementById('edit_description').value = ticketDescription;
+                document.getElementById('edit_category_id').value = ticketCategory;
+                document.getElementById('edit_priority_id').value = ticketPriority;
+                
+                // إعادة ضبط عرض حقل الأيام المخصصة
+                toggleEditCustomPriority();
+            });
+        });
+        
+        // إظهار/إخفاء حقل الأيام المخصصة
+        const editPrioritySelect = document.getElementById('edit_priority_id');
+        const editCustomPriorityContainer = document.getElementById('edit_custom_priority_container');
+        
+        function toggleEditCustomPriority() {
+            if (editPrioritySelect.value === "0") {
+                editCustomPriorityContainer.style.display = "block";
+                document.getElementById('edit_custom_priority').setAttribute('required', 'required');
+            } else {
+                editCustomPriorityContainer.style.display = "none";
+                document.getElementById('edit_custom_priority').removeAttribute('required');
+            }
         }
+        
+        // تطبيق عند تغيير الأولوية
+        editPrioritySelect.addEventListener('change', toggleEditCustomPriority);
+        
+        // تعبئة بيانات البلاغ في نافذة الحذف
+        const deleteButtons = document.querySelectorAll('.delete-ticket-btn');
+        deleteButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const ticketId = this.getAttribute('data-id');
+                const ticketTitle = this.getAttribute('data-title');
+                
+                document.getElementById('delete_ticket_id').value = ticketId;
+                document.getElementById('delete_ticket_title').textContent = ticketTitle;
+            });
+        });
+        
+        // إرسال النموذج تلقائيًا عند تغيير أي من حقول التصفية
+        const autoSubmitFields = document.querySelectorAll('.auto-submit');
+        autoSubmitFields.forEach(field => {
+            field.addEventListener('change', function() {
+                document.getElementById('filterForm').submit();
+            });
+        });
     });
+    </script>
 
-    // تعبئة بيانات البلاغ في نافذة التعديل
-    const editButtons = document.querySelectorAll('.edit-ticket-btn');
-    editButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const ticketId = this.getAttribute('data-id');
-            const ticketTitle = this.getAttribute('data-title');
-            const ticketDescription = this.getAttribute('data-description');
-            const ticketCategory = this.getAttribute('data-category');
-            const ticketPriority = this.getAttribute('data-priority');
-            
-            document.getElementById('edit_ticket_id').value = ticketId;
-            document.getElementById('edit_title').value = ticketTitle;
-            document.getElementById('edit_description').value = ticketDescription;
-            document.getElementById('edit_category_id').value = ticketCategory;
-            document.getElementById('edit_priority_id').value = ticketPriority;
-        });
-    });
-    
-    // تعبئة بيانات البلاغ في نافذة الحذف
-    const deleteButtons = document.querySelectorAll('.delete-ticket-btn');
-    deleteButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const ticketId = this.getAttribute('data-id');
-            const ticketTitle = this.getAttribute('data-title');
-            
-            document.getElementById('delete_ticket_id').value = ticketId;
-            document.getElementById('delete_ticket_title').textContent = ticketTitle;
-        });
-    });
-    
-    // إرسال النموذج تلقائيًا عند تغيير أي من حقول التصفية
-    const autoSubmitFields = document.querySelectorAll('.auto-submit');
-    autoSubmitFields.forEach(field => {
-        field.addEventListener('change', function() {
-            document.getElementById('filterForm').submit();
-        });
-    });
-});
-</script>
 {% endblock %}

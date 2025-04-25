@@ -3,6 +3,101 @@
 {% block content %}
 <h2 class="mb-4">تقارير النظام</h2>
 
+<!-- بطاقات الإحصائيات حسب الحالة -->
+<div class="row mb-4">
+    <div class="col">
+        <div class="card h-100 bg-primary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">عدد البلاغات</h5>
+                <h2 class="display-4 mb-0">{{ report_data.total_tickets }}</h2>
+                <p class="mb-0">إجمالي البلاغات في النظام</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-success text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">البلاغات الجديدة</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.new|default(0) }}</h2>
+                <p class="mb-0">بلاغات بحالة جديد</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-warning text-dark">
+            <div class="card-body text-center">
+                <h5 class="card-title">قيد المعالجة</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.in_progress|default(0) }}</h2>
+                <p class="mb-0">بلاغات قيد المعالجة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-info text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">مكتمل</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.completed|default(0) }}</h2>
+                <p class="mb-0">بلاغات مكتملة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col">
+        <div class="card h-100 bg-secondary text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">مغلق</h5>
+                <h2 class="display-4 mb-0">{{ statuses_count.closed|default(0) }}</h2>
+                <p class="mb-0">بلاغات مغلقة</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- بطاقات الإحصائيات حسب الأولوية -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card h-100 bg-danger text-white">
+            <div class="card-body text-center">
+                <h5 class="card-title">عالية</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.high|default(0) }}</h2>
+                <p class="mb-0">أولوية عالية</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card h-100" style="background-color: #e67e22; color: white;">
+            <div class="card-body text-center">
+                <h5 class="card-title">متوسطة</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.medium|default(0) }}</h2>
+                <p class="mb-0">أولوية متوسطة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card h-100" style="background-color: #f1c40f; color: black;">
+            <div class="card-body text-center">
+                <h5 class="card-title">منخفضة</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.low|default(0) }}</h2>
+                <p class="mb-0">أولوية منخفضة</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card h-100" style="background-color: #16a085; color: white;">
+            <div class="card-body text-center">
+                <h5 class="card-title">محدد بوقت</h5>
+                <h2 class="display-4 mb-0">{{ priorities_count.custom|default(0) }}</h2>
+                <p class="mb-0">أولوية بوقت محدد</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- مرشحات التقارير -->
 <div class="card mb-4">
@@ -52,68 +147,6 @@
                 </select>
             </div>
         </form>
-    </div>
-</div>
-
-<!-- ملخص التقرير -->
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card bg-primary text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">إجمالي البلاغات</h6>
-                        <h2 class="mb-0">{{ report_data.total_tickets }}</h2>
-                    </div>
-                    <i class="fas fa-ticket-alt fa-3x opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card bg-success text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">البلاغات المكتملة</h6>
-                        <h2 class="mb-0">{{ report_data.completed_tickets }}</h2>
-                        <small>{{ report_data.completion_rate }}% معدل الإكمال</small>
-                    </div>
-                    <i class="fas fa-check-circle fa-3x opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card bg-warning text-dark h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">متوسط وقت الاستجابة</h6>
-                        <h2 class="mb-0">{{ report_data.avg_response_time }}</h2>
-                        <small>ساعة</small>
-                    </div>
-                    <i class="fas fa-clock fa-3x opacity-50"></i>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card bg-danger text-white h-100">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="card-title">البلاغات المتأخرة</h6>
-                        <h2 class="mb-0">{{ report_data.overdue_tickets }}</h2>
-                        <small>{{ report_data.overdue_rate }}% من المفتوحة</small>
-                    </div>
-                    <i class="fas fa-exclamation-triangle fa-3x opacity-50"></i>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -257,9 +290,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [{
                     data: reportData.status_counts,
                     backgroundColor: [
-                        '#e74a3b',    // جديد - أحمر
-                        '#f6c23e',    // قيد المعالجة - أصفر
-                        '#1cc88a',    // مكتمل - أخضر
+                        '#198754',    // جديد - أخضر
+                        '#ffc107',    // قيد المعالجة - أصفر
+                        '#0dcaf0',    // مكتمل - أزرق فاتح
                         '#6c757d'     // مغلق - رمادي
                     ]
                 }]

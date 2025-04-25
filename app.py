@@ -86,8 +86,25 @@ class TicketPriority(db.Model):
     name = db.Column(db.String(50), nullable=False)
     response_time = db.Column(db.Integer)  # وقت الاستجابة بالساعات
     color = db.Column(db.String(7))  # لون HTML مثل #FF0000
+    is_custom = db.Column(db.Boolean, default=False)  # هل هذه أولوية بوقت محدد؟
     
     tickets = db.relationship('Ticket', backref='priority', lazy='dynamic')
+
+# إضافة الدالة التالية في app.py للتأكد من وجود أولوية "بوقت محدد"
+def ensure_custom_priority_exists():
+    """التأكد من وجود أولوية خاصة للوقت المحدد"""
+    custom_priority = TicketPriority.query.filter_by(is_custom=True).first()
+    if not custom_priority:
+        # إنشاء أولوية جديدة للوقت المحدد
+        custom_priority = TicketPriority(
+            name="بوقت محدد",
+            response_time=0,  # سيتم تحديده لكل بلاغ على حدة
+            color="#16a085",  # لون أخضر مزرق
+            is_custom=True
+        )
+        db.session.add(custom_priority)
+        db.session.commit()
+    return custom_priority
 
 
 class TicketStatus(db.Model):
@@ -434,7 +451,7 @@ def assign_ticket(ticket_id):
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 
-
+# التعديل الأول: تغيير الوظيفة create_ticket
 @app.route('/ticket/create', methods=['GET', 'POST'])
 @login_required('employee')
 def create_ticket():
@@ -454,6 +471,7 @@ def create_ticket():
         section_id = request.form.get('section_id')
         priority_id = request.form.get('priority_id', type=int)
         assigned_to_id = request.form.get('assigned_to_id')  # معرف فني الصيانة المعين
+        custom_priority = request.form.get('custom_priority') # المدة المخصصة بالأيام
         
         # تحويل القيم إلى None إذا كانت '0' أو فارغة
         if subcategory_id in ['0', '', None]:
@@ -476,7 +494,7 @@ def create_ticket():
         else:
             assigned_to_id = int(assigned_to_id)
         
-        if not all([description, category_id, priority_id]):
+        if not all([description, category_id]):
             flash('يرجى ملء جميع الحقول المطلوبة', 'error')
             return render_template('create_ticket.html', 
                                   categories=categories, 
@@ -484,14 +502,9 @@ def create_ticket():
                                   departments=departments,
                                   maintenance_staff=maintenance_staff)
         
-        # الحصول على حالة "جديد" أو "قيد المعالجة" حسب ما إذا تم تعيين فني أم لا
-        if assigned_to_id:
-            # إذا تم تعيين فني، نجعل حالة البلاغ "قيد المعالجة"
-            status = TicketStatus.query.filter_by(name='قيد المعالجة').first()
-        else:
-            # إذا لم يتم تعيين فني، نجعل حالة البلاغ "جديد"
-            status = TicketStatus.query.filter_by(name='جديد').first()
-            
+        # تغيير: جعل حالة البلاغ "جديد" دائماً بغض النظر عن تعيين فني أم لا
+        status = TicketStatus.query.filter_by(name='جديد').first()
+        
         if not status:
             flash('خطأ في النظام: حالة البلاغ غير موجودة', 'error')
             return render_template('create_ticket.html', 
@@ -499,6 +512,35 @@ def create_ticket():
                                   priorities=priorities, 
                                   departments=departments,
                                   maintenance_staff=maintenance_staff)
+        
+        # إذا كان المستخدم قد اختار "بوقت محدد"
+        if priority_id == 0 and custom_priority:
+            # إنشاء عنوان للأولوية المخصصة
+            priority_name = f"خلال {custom_priority} يوم"
+            
+            # حساب وقت الاستجابة بالساعات (الأيام × 24 ساعة)
+            custom_response_time = int(custom_priority) * 24
+            
+            # إنشاء أولوية مخصصة مؤقتة (لن يتم حفظها في قاعدة البيانات)
+            custom_priority_obj = TicketPriority(
+                name=priority_name,
+                response_time=custom_response_time,
+                color="#6c757d"  # لون رمادي
+            )
+            
+            # استخدام الأولوية المخصصة لحساب الموعد النهائي
+            due_date = datetime.utcnow() + timedelta(hours=custom_response_time)
+            
+            # تحديد أولوية منخفضة كقيمة افتراضية للحقل الخارجي
+            default_priority = TicketPriority.query.filter_by(name='منخفضة').first()
+            if not default_priority:
+                default_priority = TicketPriority.query.first()
+            
+            # استخدام معرف الأولوية الافتراضية في قاعدة البيانات
+            priority_id = default_priority.id
+        else:
+            # حساب الموعد النهائي بناءً على الأولوية المحددة
+            due_date = calculate_due_date(priority_id)
         
         # إنشاء عنوان افتراضي للبلاغ إذا لم يتم توفيره
         auto_title = f"{Category.query.get(category_id).name}"
@@ -521,7 +563,7 @@ def create_ticket():
             priority_id=priority_id,
             assigned_to_id=assigned_to_id,  # تعيين الفني المسؤول
             status_id=status.id,
-            due_date=calculate_due_date(priority_id)
+            due_date=due_date
         )
         
         db.session.add(ticket)
@@ -742,21 +784,45 @@ def maintenance_dashboard():
     new_tickets = []
     in_progress_tickets = []
     completed_tickets = []
+    closed_tickets = 0
+    
+    # إحصائيات الأولويات
+    priorities_count = {
+        'high': 0,
+        'medium': 0,
+        'low': 0,
+        'custom': 0
+    }
     
     for ticket in assigned_tickets:
+        # تصنيف حسب الحالة
         if ticket.status.name == 'جديد':
             new_tickets.append(ticket)
         elif ticket.status.name == 'قيد المعالجة':
             in_progress_tickets.append(ticket)
         elif ticket.status.name == 'مكتمل':
             completed_tickets.append(ticket)
+        elif ticket.status.name == 'مغلق':
+            closed_tickets += 1
+        
+        # تصنيف حسب الأولوية
+        if ticket.priority.name == 'عالية':
+            priorities_count['high'] += 1
+        elif ticket.priority.name == 'متوسطة':
+            priorities_count['medium'] += 1
+        elif ticket.priority.name == 'منخفضة':
+            priorities_count['low'] += 1
+        elif ticket.priority.is_custom:
+            priorities_count['custom'] += 1
     
     return render_template(
         'maintenance_dashboard.html',
         new_tickets=new_tickets,
         in_progress_tickets=in_progress_tickets,
         completed_tickets=completed_tickets,
-        total_assigned=len(assigned_tickets)
+        closed_tickets=closed_tickets,
+        total_assigned=len(assigned_tickets),
+        priorities_count=priorities_count
     )
 
 
@@ -826,6 +892,7 @@ def setup_api():
         high_priority = TicketPriority(name='عالية', response_time=24, color='#FF0000')
         medium_priority = TicketPriority(name='متوسطة', response_time=72, color='#FFAA00')
         low_priority = TicketPriority(name='منخفضة', response_time=120, color='#00AA00')
+        custom_priority = TicketPriority(name='بوقت محدد', response_time=0, color='#16a085', is_custom=True)
         
         db.session.add_all([high_priority, medium_priority, low_priority])
         db.session.flush()
@@ -1075,8 +1142,50 @@ def admin_delete_user():
     flash('تم حذف المستخدم بنجاح', 'success')
     return redirect(url_for('admin_users'))
 
+def get_dashboard_statistics():
+    """الحصول على إحصائيات البلاغات حسب الحالة والأولوية"""
+    
+    # إحصائيات حسب الحالة
+    statuses = TicketStatus.query.all()
+    statuses_count = {
+        'new': 0,
+        'in_progress': 0,
+        'completed': 0,
+        'closed': 0
+    }
+    
+    for status in statuses:
+        if status.name == 'جديد':
+            statuses_count['new'] = status.tickets.count()
+        elif status.name == 'قيد المعالجة':
+            statuses_count['in_progress'] = status.tickets.count()
+        elif status.name == 'مكتمل':
+            statuses_count['completed'] = status.tickets.count()
+        elif status.name == 'مغلق':
+            statuses_count['closed'] = status.tickets.count()
+    
+    # إحصائيات حسب الأولوية
+    priorities = TicketPriority.query.all()
+    priorities_count = {
+        'high': 0,
+        'medium': 0,
+        'low': 0,
+        'custom': 0
+    }
+    
+    for priority in priorities:
+        if priority.name == 'عالية':
+            priorities_count['high'] = priority.tickets.count()
+        elif priority.name == 'متوسطة':
+            priorities_count['medium'] = priority.tickets.count()
+        elif priority.name == 'منخفضة':
+            priorities_count['low'] = priority.tickets.count()
+        elif priority.is_custom:  # تحقق باستخدام الحقل الجديد is_custom
+            priorities_count['custom'] = priority.tickets.count()
+    
+    return statuses_count, priorities_count
 
-# تحديث مسار admin_dashboard ليدعم مرشح التصنيف
+# تعديل مسار admin_dashboard ليشمل الإحصائيات الجديدة
 @app.route('/admin/dashboard')
 @login_required('admin')
 def admin_dashboard():
@@ -1119,6 +1228,9 @@ def admin_dashboard():
         elif priority.name == 'منخفضة':
             priority_colors['low'] = priority.color or '#1cc88a'
     
+    # الحصول على إحصائيات لوحة المعلومات
+    statuses_count, priorities_count = get_dashboard_statistics()
+    
     return render_template(
         'admin_dashboard.html',
         tickets=tickets,
@@ -1132,7 +1244,9 @@ def admin_dashboard():
         open_tickets=open_tickets,
         high_priority=high_priority,
         completed_tickets=completed_tickets,
-        priority_colors=priority_colors
+        priority_colors=priority_colors,
+        statuses_count=statuses_count,
+        priorities_count=priorities_count
     )
 
 
@@ -1144,7 +1258,12 @@ def admin_edit_ticket():
     title = request.form.get('title')
     description = request.form.get('description')
     category_id = request.form.get('category_id', type=int)
-    priority_id = request.form.get('priority_id', type=int)
+    priority_id = request.form.get('priority_id')
+    custom_priority = request.form.get('custom_priority')
+    
+    if not all([ticket_id, title, description, category_id]):
+        flash('يرجى ملء جميع الحقول المطلوبة', 'error')
+        return redirect(url_for('admin_dashboard'))
     
     ticket = Ticket.query.get_or_404(ticket_id)
     
@@ -1153,10 +1272,24 @@ def admin_edit_ticket():
     ticket.description = description
     ticket.category_id = category_id
     
-    # إذا تغيرت الأولوية، نعيد حساب الموعد النهائي
-    if ticket.priority_id != priority_id:
-        ticket.priority_id = priority_id
-        ticket.due_date = calculate_due_date(priority_id)
+    # معالجة الأولوية
+    if priority_id == '0' and custom_priority:  # إذا تم اختيار "بوقت محدد"
+        # التأكد من وجود أولوية بوقت محدد
+        custom_priority_obj = ensure_custom_priority_exists()
+        
+        # تعيين أولوية البلاغ إلى "بوقت محدد"
+        ticket.priority_id = custom_priority_obj.id
+        
+        # حساب الموعد النهائي
+        custom_days = int(custom_priority)
+        custom_hours = custom_days * 24
+        ticket.due_date = datetime.utcnow() + timedelta(hours=custom_hours)
+    else:
+        # استخدام الأولوية المحددة
+        priority_id = int(priority_id)
+        if ticket.priority_id != priority_id:
+            ticket.priority_id = priority_id
+            ticket.due_date = calculate_due_date(priority_id)
     
     db.session.commit()
     
@@ -1287,9 +1420,8 @@ def admin_delete_category():
     flash('تم حذف التصنيف بنجاح', 'success')
     return redirect(url_for('admin_categories'))
 
-#-------------------------
-# مسارات تقارير النظام
-#-------------------------
+
+# تعديل مسار admin_report لإضافة المعلومات الإحصائية للبلاغات
 @app.route('/admin/report')
 @login_required('admin')
 def admin_report():
@@ -1331,6 +1463,9 @@ def admin_report():
     # البيانات المستخدمة في الرسوم البيانية
     report_data = generate_report_data(tickets, date_range, statuses, categories)
     
+    # الحصول على إحصائيات لوحة المعلومات
+    statuses_count, priorities_count = get_dashboard_statistics()
+    
     return render_template(
         'admin_report.html',
         date_range=date_range,
@@ -1340,7 +1475,9 @@ def admin_report():
         categories=categories,
         users=users,
         priorities=priorities,
-        report_data=report_data
+        report_data=report_data,
+        statuses_count=statuses_count,
+        priorities_count=priorities_count
     )
 
 def generate_report_data(tickets, date_range, statuses, categories):
@@ -1504,7 +1641,6 @@ def generate_technician_performance(tickets):
     return technicians
 
 
-# مسار صفحة بلاغاتي للموظفين
 @app.route('/my_tickets')
 @login_required('employee')
 def my_tickets():
@@ -1518,6 +1654,7 @@ def my_tickets():
     open_tickets = []
     in_progress_tickets = []
     completed_tickets = []
+    closed_tickets = 0
     
     for ticket in tickets:
         if ticket.status.name == 'جديد':
@@ -1526,15 +1663,17 @@ def my_tickets():
             in_progress_tickets.append(ticket)
         elif ticket.status.name == 'مكتمل':
             completed_tickets.append(ticket)
+        elif ticket.status.name == 'مغلق':
+            closed_tickets += 1
     
     return render_template(
         'my_tickets.html',
         open_tickets=open_tickets,
         in_progress_tickets=in_progress_tickets,
         completed_tickets=completed_tickets,
+        closed_tickets=closed_tickets,
         total_tickets=len(tickets)
     )
-
 
 @app.route('/maintenance/reports')
 @login_required('maintenance')
