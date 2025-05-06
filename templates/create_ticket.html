@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block head %}
+<!-- إضافة ملف CSS خاص بصفحات البلاغات -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ticket_styles.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
     <div class="col-md-8">
@@ -11,22 +16,67 @@
                 <form method="POST" action="{{ url_for('create_ticket') }}" enctype="multipart/form-data" id="ticketForm" autocomplete="off">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                     
+                    <!-- طريقة استلام البلاغ -->
+                    <div class="contact-method-container">
+                        <label class="form-label">طريقة استلام البلاغ</label>
+                        <div class="row">
+                            <div class="col-md-6 mb-2">
+                                <div class="contact-method-option" id="option1">
+                                    <input type="radio" name="contact_method" id="contact_method1" value="حضور شخصي" required checked>
+                                    <span class="icon"><i class="fas fa-user"></i></span>
+                                    <label for="contact_method1">حضور شخصي</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="contact-method-option" id="option2">
+                                    <input type="radio" name="contact_method" id="contact_method2" value="بريد إلكتروني" required>
+                                    <span class="icon"><i class="fas fa-envelope"></i></span>
+                                    <label for="contact_method2">بريد إلكتروني</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="contact-method-option" id="option3">
+                                    <input type="radio" name="contact_method" id="contact_method3" value="واتساب" required>
+                                    <span class="icon"><i class="fab fa-whatsapp"></i></span>
+                                    <label for="contact_method3">واتساب</label>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-2">
+                                <div class="contact-method-option" id="option4">
+                                    <input type="radio" name="contact_method" id="contact_method4" value="اتصال" required>
+                                    <span class="icon"><i class="fas fa-phone"></i></span>
+                                    <label for="contact_method4">اتصال</label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="department_id" class="form-label">الإدارة</label>
-                            <select class="form-select" id="department_id" name="department_id" required>
-                                <option value="" selected disabled>-- اختر الإدارة --</option>
-                                {% for department in departments %}
-                                <option value="{{ department.id }}">{{ department.name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select" id="department_id" name="department_id" required>
+                                    <option value="" selected disabled>-- اختر الإدارة --</option>
+                                    {% for department in departments %}
+                                    <option value="{{ department.id }}">{{ department.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addDepartmentModal">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="col-md-6">
                             <label for="section_id" class="form-label">القسم</label>
-                            <select class="form-select" id="section_id" name="section_id" disabled>
-                                <option value="" selected disabled>-- اختر القسم --</option>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select" id="section_id" name="section_id" disabled>
+                                    <option value="" selected disabled>-- اختر القسم --</option>
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" id="addSectionBtn" data-bs-toggle="modal" data-bs-target="#addSectionModal" disabled>
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                             <div class="form-text">يرجى تحديد الإدارة أولاً</div>
                         </div>
                     </div>
@@ -47,19 +97,29 @@
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="category_id" class="form-label">التصنيف</label>
-                            <select class="form-select" id="category_id" name="category_id" required>
-                                <option value="" selected disabled>-- اختر التصنيف --</option>
-                                {% for category in categories %}
-                                <option value="{{ category.id }}">{{ category.name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select" id="category_id" name="category_id" required>
+                                    <option value="" selected disabled>-- اختر التصنيف --</option>
+                                    {% for category in categories %}
+                                    <option value="{{ category.id }}">{{ category.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addCategoryModal">
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                         </div>
                         
                         <div class="col-md-6">
                             <label for="subcategory_id" class="form-label">التصنيف الفرعي</label>
-                            <select class="form-select" id="subcategory_id" name="subcategory_id" disabled>
-                                <option value="" selected disabled>-- اختر التصنيف الفرعي --</option>
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select" id="subcategory_id" name="subcategory_id" disabled>
+                                    <option value="" selected disabled>-- اختر التصنيف الفرعي --</option>
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" id="addSubcategoryBtn" data-bs-toggle="modal" data-bs-target="#addSubcategoryModal" disabled>
+                                    <i class="fas fa-plus"></i>
+                                </button>
+                            </div>
                             <div class="form-text">يرجى تحديد التصنيف أولاً</div>
                         </div>
                     </div>
@@ -88,12 +148,17 @@
                         
                         <div class="col-md-6" id="maintenance_container">
                             <label for="assigned_to_id" class="form-label">تعيين إلى فني الصيانة</label>
-                            <select class="form-select" id="assigned_to_id" name="assigned_to_id">
-                                <option value="" selected disabled>-- اختر فني الصيانة --</option>
-                                {% for tech in maintenance_staff %}
-                                <option value="{{ tech.id }}">{{ tech.name }}</option>
-                                {% endfor %}
-                            </select>
+                            <div class="input-group">
+                                <select class="form-select" id="assigned_to_id" name="assigned_to_id">
+                                    <option value="" selected disabled>-- اختر فني الصيانة --</option>
+                                    {% for tech in maintenance_staff %}
+                                    <option value="{{ tech.id }}" data-phone="{{ tech.phone }}">{{ tech.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button class="btn btn-outline-secondary" type="button" id="sendWhatsappBtn" disabled>
+                                    <i class="fab fa-whatsapp"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
@@ -139,7 +204,6 @@
     </div>
 </div>
 
-
 <!-- نافذة إضافة مستفيد سريعة -->
 <div class="modal fade" id="addQuickBeneficiaryModal" tabindex="-1" aria-labelledby="addQuickBeneficiaryModalLabel" aria-hidden="true">
     <div class="modal-dialog">
@@ -166,7 +230,99 @@
     </div>
 </div>
 
+<!-- نافذة إضافة إدارة جديدة -->
+<div class="modal fade" id="addDepartmentModal" tabindex="-1" aria-labelledby="addDepartmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addDepartmentModalLabel">إضافة إدارة جديدة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="new_department_name" class="form-label">اسم الإدارة</label>
+                    <input type="text" class="form-control" id="new_department_name" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="save_department">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
 
+<!-- نافذة إضافة قسم جديد -->
+<div class="modal fade" id="addSectionModal" tabindex="-1" aria-labelledby="addSectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addSectionModalLabel">إضافة قسم جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3" id="department_for_section_container">
+                    <!-- سيتم إضافة اسم الإدارة هنا بواسطة JavaScript -->
+                </div>
+                <div class="mb-3">
+                    <label for="new_section_name" class="form-label">اسم القسم</label>
+                    <input type="text" class="form-control" id="new_section_name" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="save_section">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة تصنيف جديد -->
+<div class="modal fade" id="addCategoryModal" tabindex="-1" aria-labelledby="addCategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addCategoryModalLabel">إضافة تصنيف جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="new_category_name" class="form-label">اسم التصنيف</label>
+                    <input type="text" class="form-control" id="new_category_name" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="save_category">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- نافذة إضافة تصنيف فرعي جديد -->
+<div class="modal fade" id="addSubcategoryModal" tabindex="-1" aria-labelledby="addSubcategoryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addSubcategoryModalLabel">إضافة تصنيف فرعي جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3" id="category_for_subcategory_container">
+                    <!-- سيتم إضافة اسم التصنيف هنا بواسطة JavaScript -->
+                </div>
+                <div class="mb-3">
+                    <label for="new_subcategory_name" class="form-label">اسم التصنيف الفرعي</label>
+                    <input type="text" class="form-control" id="new_subcategory_name" required>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="save_subcategory">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 {% endblock %}
 
@@ -174,118 +330,4 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 <script src="{{ url_for('static', filename='js/create_ticket.js') }}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const prioritySelect = document.getElementById('priority_id');
-    const customPriorityContainer = document.getElementById('custom_priority_container');
-    const customPrioritySelect = document.getElementById('custom_priority');
-    const maintenanceContainer = document.getElementById('maintenance_container');
-    const beneficiaryNameInput = document.getElementById('beneficiary_name');
-    const beneficiaryIdInput = document.getElementById('beneficiary_id');
-    
-    // دالة لاظهار/اخفاء حقل الوقت المخصص
-    function toggleCustomPriority() {
-        if (prioritySelect.value === "0") {
-            customPriorityContainer.style.display = "block";
-            customPrioritySelect.setAttribute('required', 'required');
-            maintenanceContainer.className = "col-md-6 mt-3";
-        } else {
-            customPriorityContainer.style.display = "none";
-            customPrioritySelect.removeAttribute('required');
-            maintenanceContainer.className = "col-md-6";
-        }
-    }
-    
-    // تطبيق التغييرات عند تغيير الأولوية
-    prioritySelect.addEventListener('change', toggleCustomPriority);
-    
-    // التطبيق الأولي عند تحميل الصفحة
-    toggleCustomPriority();
-    
-    // تهيئة البحث التلقائي للمستفيدين
-    $(beneficiaryNameInput).autocomplete({
-        source: function(request, response) {
-            $.getJSON("/api/beneficiaries/search", { term: request.term }, function(data) {
-                response(data);
-            });
-        },
-        minLength: 2,
-        select: function(event, ui) {
-            // تعديل هنا: دع jQuery UI يتعامل مع تعيين القيمة
-            beneficiaryIdInput.value = ui.item.id;
-            return true;
-        },
-        response: function(event, ui) {
-            // للتحقق من أن البحث يعمل
-            console.log('تم الرد بـ', ui.content.length, 'نتائج');
-        }
-    });
-
-    
-    // إضافة مستفيد جديد من النافذة المنبثقة
-    document.getElementById('save_quick_beneficiary').addEventListener('click', function() {
-        const name = document.getElementById('quick_beneficiary_name').value;
-        const phone = document.getElementById('quick_beneficiary_phone').value;
-        
-        if (!name) {
-            alert('يرجى إدخال اسم المستفيد');
-            return;
-        }
-        
-        // الحصول على CSRF token
-        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
-        
-        // إرسال طلب AJAX لإضافة المستفيد
-        fetch('/api/beneficiaries/add', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Requested-With': 'XMLHttpRequest',
-                'X-CSRFToken': csrfToken  // إضافة CSRF token
-            },
-            body: JSON.stringify({
-                name: name,
-                phone: phone
-            })
-        })
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('حدث خطأ أثناء إضافة المستفيد');
-            }
-            return response.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                // تحديث حقل المستفيد
-                beneficiaryNameInput.value = data.beneficiary.name;
-                beneficiaryIdInput.value = data.beneficiary.id;
-                
-                // إغلاق النافذة المنبثقة
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addQuickBeneficiaryModal'));
-                modal.hide();
-                
-                // مسح حقول النافذة المنبثقة
-                document.getElementById('quick_beneficiary_name').value = '';
-                document.getElementById('quick_beneficiary_phone').value = '';
-                
-                // عرض رسالة نجاح
-                alert('تم إضافة المستفيد بنجاح');
-            } else {
-                alert(data.message);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('حدث خطأ أثناء إضافة المستفيد');
-        });
-    });
-
-    // مسح معرف المستفيد عند تغيير النص
-    beneficiaryNameInput.addEventListener('input', function() {
-        if (this.value === '') {
-            beneficiaryIdInput.value = '';
-        }
-    });
-});
-</script>
 {% endblock %}

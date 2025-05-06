@@ -1,0 +1,269 @@
+/**
+ * create_ticket.css
+ * أنماط خاصة بصفحة إنشاء البلاغات في نظام Fixltpro
+ */
+
+/* ===== قسم طريقة استلام البلاغ ===== */
+.contact-method-container {
+    margin-bottom: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.contact-method-container .form-label {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    display: block;
+    color: #495057;
+    font-size: 0.95rem;
+}
+
+.contact-method-option {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    border: 2px solid transparent;
+    background-color: white;
+    width: 100%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.contact-method-option:hover {
+    background-color: #e9ecef;
+    transform: translateY(-2px);
+}
+
+.contact-method-option.active {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.contact-method-option input {
+    position: absolute;
+    opacity: 0;
+}
+
+.contact-method-option label {
+    font-weight: 500;
+    margin-bottom: 0;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+    color: #495057;
+}
+
+.contact-method-option .icon {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 1.25rem;
+    width: 24px;
+    text-align: center;
+    color: #0d6efd;
+}
+
+/* ===== تنسيقات الحقول العامة ===== */
+.form-label {
+    font-weight: 500;
+    color: #495057;
+}
+
+.form-select, .form-control {
+    border-color: #ced4da;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+.form-text {
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+/* ===== تنسيقات البحث التلقائي للمستفيدين ===== */
+.ui-autocomplete {
+    max-height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    z-index: 9999 !important;
+    border-radius: 0.25rem;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+    border: 1px solid #ced4da;
+    padding: 0.5rem 0;
+    font-size: 0.9rem;
+}
+
+.ui-autocomplete .ui-menu-item {
+    padding: 0;
+}
+
+.ui-autocomplete .ui-menu-item-wrapper {
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    border: none !important;
+    border-left: 3px solid transparent !important;
+}
+
+.ui-autocomplete .ui-menu-item-wrapper.ui-state-active {
+    background-color: #f8f9fa;
+    color: #0d6efd;
+    margin: 0;
+    border-left: 3px solid #0d6efd !important;
+}
+
+.ui-helper-hidden-accessible {
+    display: none;
+}
+
+.loading {
+    background-image: url('../images/loading.gif');
+    background-size: 20px 20px;
+    background-position: left 10px center;
+    background-repeat: no-repeat;
+    padding-left: 40px;
+}
+
+/* ===== تنسيقات معاينة المرفقات ===== */
+.preview-container {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+}
+
+.preview-container .form-label {
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    display: block;
+    color: #495057;
+}
+
+#attachments-preview .card {
+    transition: transform 0.2s ease-in-out;
+    overflow: hidden;
+    border: 1px solid #e9ecef;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+#attachments-preview .card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+#attachments-preview .card-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background-color: #fff;
+}
+
+#attachments-preview .img-thumbnail {
+    border: 1px solid #ced4da;
+    object-fit: cover;
+}
+
+/* ===== تنسيقات أزرار الإضافة ===== */
+.input-group .btn-outline-secondary {
+    color: #6c757d;
+    border-color: #ced4da;
+}
+
+.input-group .btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+}
+
+.btn-outline-secondary:focus {
+    box-shadow: 0 0 0 0.25rem rgba(108, 117, 125, 0.25);
+}
+
+/* ===== تنسيقات عامة ===== */
+.card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.card-header {
+    font-weight: 600;
+    padding: 0.75rem 1.25rem;
+}
+
+.alert-info {
+    background-color: #f0f7ff;
+    border-color: #b8ddff;
+    color: #0c5fdf;
+}
+
+/* ===== تنسيقات النافذة المنبثقة ===== */
+.modal-header {
+    border-bottom: 1px solid #e9ecef;
+}
+
+.modal-title {
+    font-weight: 600;
+}
+
+.modal-content {
+    border: none;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+    border-radius: 0.5rem;
+}
+
+.modal-footer {
+    border-top: 1px solid #e9ecef;
+}
+
+/* ===== تنسيقات الملاحظة الهامة ===== */
+.alert-info .fas.fa-info-circle {
+    color: #0d6efd;
+}
+
+.alert-info h6 {
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+}
+
+.alert-info p {
+    color: #495057;
+}
+
+/* ===== زر إرسال البلاغ ===== */
+.btn-primary {
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 10px rgba(13, 110, 253, 0.3);
+}
+
+/* تصحيح اتجاه RTL للقوائم المنسدلة في اتصال الـ API */
+.ui-autocomplete-loading {
+    background-position: left center;
+    padding-left: 30px !important;
+}
+
+/* تحسين مظهر الفورم في الشاشات الصغيرة */
+@media (max-width: 767.98px) {
+    .contact-method-option {
+        margin-bottom: 0.75rem;
+    }
+    
+    .card-body {
+        padding: 1rem;
+    }
+}

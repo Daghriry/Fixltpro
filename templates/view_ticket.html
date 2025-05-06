@@ -1,514 +1,519 @@
 {% extends "base.html" %}
 
+{% block head %}
+<!-- إضافة ملف CSS خاص بصفحات البلاغات -->
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ticket_styles.css') }}">
+{% endblock %}
+
 {% block content %}
-<div class="mb-3">
-    <a href="javascript:history.back()" class="btn btn-outline-secondary">
-        <i class="fas fa-arrow-right me-1"></i>العودة
-    </a>
-</div>
-
-{# تحضير بيانات البلاغ والأولويات #}
-<script type="text/javascript">
-    // تحضير ألوان وبيانات الأولويات
-    var ticketData = {
-        "priority": "{{ ticket.priority.name }}",
-        "priorityColor": "{{ ticket.priority.color }}"
-    };
-</script>
-
-<div class="row">
-    <!-- تفاصيل البلاغ -->
-    <div class="col-md-8">
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">
-                    <i class="fas fa-ticket-alt me-2"></i>
-                    {% if ticket.title %}
-                    بلاغ #{{ ticket.id }}: {{ ticket.title }}
-                    {% else %}
-                    بلاغ #{{ ticket.id }}
+<div class="container-fluid py-3" id="ticketContainer" 
+     data-ticket-id="{{ ticket.id }}"
+     data-ticket-title="{{ ticket.title|escape }}"
+     data-ticket-category="{{ ticket.category.name|escape }}"
+     data-ticket-priority="{{ ticket.priority.name|escape }}"
+     data-ticket-beneficiary="{{ ticket.beneficiary.name|escape if ticket.beneficiary else 'غير محدد' }}"
+     data-ticket-department="{{ ticket.department.name|escape if ticket.department else 'غير محدد' }}"
+     data-ticket-description="{{ ticket.description|replace('\n', ' ')|replace('"', '\\"')|escape }}"
+     data-ticket-contact-method="{{ ticket.contact_method|escape if ticket.contact_method else 'غير محدد' }}">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">بلاغ رقم #{{ ticket.id }}</h5>
+                    {% if get_current_user().id == ticket.created_by_id or get_current_user().user_type == 'admin' %}
+                    <button class="btn btn-sm btn-light" data-bs-toggle="modal" data-bs-target="#editTicketModal">
+                        <i class="fas fa-edit"></i> تعديل البلاغ
+                    </button>
                     {% endif %}
-                </h5>
-                <span class="badge
-                    {% if ticket.status.name == 'جديد' %}bg-danger
-                    {% elif ticket.status.name == 'قيد المعالجة' %}bg-warning text-dark
-                    {% elif ticket.status.name == 'مكتمل' %}bg-success
-                    {% elif ticket.status.name == 'مغلق' %}bg-secondary
-                    {% endif %}">
-                    {{ ticket.status.name }}
-                </span>
-            </div>
-            <div class="card-body">
-                <!-- معلومات القسم والإدارة -->
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <div class="ticket-info">
-                            <strong>الإدارة:</strong> {{ ticket.department.name if ticket.department else 'غير محدد' }}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="ticket-info">
-                            <strong>القسم:</strong> {{ ticket.section.name if ticket.section else 'غير محدد' }}
-                        </div>
-                    </div>
                 </div>
-
-                <div class="row mb-3">
-                    <!-- المعلومات الأساسية -->
-                    <div class="col-md-6">
-                        <div class="ticket-info">
-                            <strong>المنشئ:</strong> {{ ticket.creator.name }}
-                        </div>
-                        <div class="ticket-info">
-                            <strong>تاريخ الإنشاء:</strong> {{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}
-                        </div>
-                        <div class="ticket-info">
-                            <strong>الموعد النهائي:</strong>
-                            {% if ticket.due_date %}
-                                <span class="{% if ticket.is_overdue() %}text-danger fw-bold{% endif %}">
-                                    {{ ticket.due_date.strftime('%Y/%m/%d %H:%M') }}
-                                    {% if ticket.is_overdue() %}
-                                        <i class="fas fa-exclamation-triangle ms-1"></i>
-                                    {% endif %}
-                                </span>
-                            {% else %}
-                                <span class="text-muted">غير محدد</span>
-                            {% endif %}
-                        </div>
-                        <!-- إضافة معلومات المستفيد -->
-                        <div class="ticket-info">
-                            <strong>المستفيد:</strong>
-                            {% if ticket.beneficiary %}
-                                {{ ticket.beneficiary.name }}
-                                {% if ticket.beneficiary.department or ticket.beneficiary.position %}
-                                    <span class="text-muted">
-                                        ({% if ticket.beneficiary.position %}{{ ticket.beneficiary.position }}{% endif %}
-                                        {% if ticket.beneficiary.position and ticket.beneficiary.department %} - {% endif %}
-                                        {% if ticket.beneficiary.department %}{{ ticket.beneficiary.department }}{% endif %})
-                                    </span>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">معلومات البلاغ</h6>
+                            <table class="table table-striped table-sm ticket-info-table">
+                                <tr>
+                                    <th>العنوان:</th>
+                                    <td>{{ ticket.title }}</td>
+                                </tr>
+                                <tr>
+                                    <th>تاريخ الإنشاء:</th>
+                                    <td>{{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                                </tr>
+                                <tr>
+                                    <th>طريقة الاستلام:</th>
+                                    <td>
+                                        {% if ticket.contact_method == 'حضور شخصي' %}
+                                            <i class="fas fa-user me-1"></i> {{ ticket.contact_method }}
+                                        {% elif ticket.contact_method == 'بريد إلكتروني' %}
+                                            <i class="fas fa-envelope me-1"></i> {{ ticket.contact_method }}
+                                        {% elif ticket.contact_method == 'واتساب' %}
+                                            <i class="fab fa-whatsapp me-1"></i> {{ ticket.contact_method }}
+                                        {% elif ticket.contact_method == 'اتصال' %}
+                                            <i class="fas fa-phone me-1"></i> {{ ticket.contact_method }}
+                                        {% else %}
+                                            {{ ticket.contact_method if ticket.contact_method else 'غير محدد' }}
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>التصنيف:</th>
+                                    <td>{{ ticket.category.name }} {% if ticket.subcategory %} - {{ ticket.subcategory.name }}{% endif %}</td>
+                                </tr>
+                                <tr>
+                                    <th>الأولوية:</th>
+                                    <td>
+                                        {% if ticket.priority.name == 'عالية' %}
+                                            <span class="priority-badge high">{{ ticket.priority.name }}</span>
+                                        {% elif ticket.priority.name == 'متوسطة' %}
+                                            <span class="priority-badge medium">{{ ticket.priority.name }}</span>
+                                        {% elif ticket.priority.name == 'منخفضة' %}
+                                            <span class="priority-badge low">{{ ticket.priority.name }}</span>
+                                        {% else %}
+                                            <span class="priority-badge custom">{{ ticket.priority.name }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <th>الحالة:</th>
+                                    <td>
+                                        {% if ticket.status.name == 'جديد' %}
+                                            <span class="status-badge new">{{ ticket.status.name }}</span>
+                                        {% elif ticket.status.name == 'قيد المعالجة' %}
+                                            <span class="status-badge in-progress">{{ ticket.status.name }}</span>
+                                        {% elif ticket.status.name == 'مكتمل' %}
+                                            <span class="status-badge completed">{{ ticket.status.name }}</span>
+                                        {% elif ticket.status.name == 'مغلق' %}
+                                            <span class="status-badge closed">{{ ticket.status.name }}</span>
+                                        {% else %}
+                                            <span class="status-badge other">{{ ticket.status.name }}</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% if ticket.due_date %}
+                                <tr>
+                                    <th>الموعد النهائي:</th>
+                                    <td class="ticket-due-date">
+                                        {{ ticket.due_date.strftime('%Y-%m-%d %H:%M') }}
+                                        {% if ticket.is_overdue() %}<span class="badge bg-danger ms-2">متأخر</span>{% endif %}
+                                    </td>
+                                </tr>
                                 {% endif %}
-                            {% else %}
-                                <span class="text-muted">غير محدد</span>
-                            {% endif %}
+                            </table>
+                        </div>
+                        <div class="col-md-6">
+                            <h6 class="text-muted mb-2">بيانات المستفيد والإدارة</h6>
+                            <table class="table table-striped table-sm ticket-info-table">
+                                {% if ticket.beneficiary %}
+                                <tr>
+                                    <th>المستفيد:</th>
+                                    <td>{{ ticket.beneficiary.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>رقم الجوال:</th>
+                                    <td>{{ ticket.beneficiary.phone or "غير متوفر" }}</td>
+                                </tr>
+                                {% endif %}
+                                <tr>
+                                    <th>منشئ البلاغ:</th>
+                                    <td>{{ ticket.creator.name }}</td>
+                                </tr>
+                                <tr>
+                                    <th>الفني المسؤول:</th>
+                                    <td>{{ ticket.assignee.name if ticket.assignee else "غير معين" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>الإدارة:</th>
+                                    <td>{{ ticket.department.name if ticket.department else "غير محدد" }}</td>
+                                </tr>
+                                <tr>
+                                    <th>القسم:</th>
+                                    <td>{{ ticket.section.name if ticket.section else "غير محدد" }}</td>
+                                </tr>
+                            </table>
                         </div>
                     </div>
                     
-                    <!-- معلومات التصنيف -->
-                    <div class="col-md-6">
-                        <div class="ticket-info">
-                            <strong>التصنيف:</strong> {{ ticket.category.name }}
-                            {% if ticket.subcategory %}
-                                <span class="badge bg-secondary ms-1">{{ ticket.subcategory.name }}</span>
-                            {% endif %}
-                        </div>
-                        <div class="ticket-info">
-                            <strong>الأولوية:</strong>
-                            <span class="badge priority-badge" data-priority="{{ ticket.priority.name }}">
-                                {% if "خلال" in ticket.priority.name %}
-                                    {{ ticket.priority.name }}
-                                {% elif ticket.priority.name == "منخفضة" and ticket.due_date %}
-                                    {% set days_diff = ((ticket.due_date - ticket.created_at).total_seconds() / 86400)|round|int %}
-                                    {% if days_diff > 0 %}
-                                        خلال {{ days_diff }} يوم
-                                    {% else %}
-                                        {{ ticket.priority.name }}
-                                    {% endif %}
-                                {% else %}
-                                    {{ ticket.priority.name }}
-                                {% endif %}
-                            </span>
-                        </div>
-                        <div class="ticket-info">
-                            <strong>فني الصيانة:</strong>
-                            {% if ticket.assignee %}
-                                {{ ticket.assignee.name }}
-                            {% else %}
-                                <span class="text-muted">غير معين</span>
-                            {% endif %}
+                    <div class="mt-4">
+                        <h6 class="text-muted">وصف المشكلة</h6>
+                        <div class="card">
+                            <div class="card-body bg-light ticket-description">
+                                {{ ticket.description | nl2br }}
+                            </div>
                         </div>
                     </div>
+                    
+                    {% if attachments %}
+                    <div class="mt-4">
+                        <h6 class="text-muted mb-2">المرفقات</h6>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm ticket-attachments-table">
+                                <thead>
+                                    <tr>
+                                        <th>#</th>
+                                        <th>اسم الملف</th>
+                                        <th>المستخدم</th>
+                                        <th>تاريخ الرفع</th>
+                                        <th>الإجراءات</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for attachment in attachments %}
+                                    <tr>
+                                        <td>{{ loop.index }}</td>
+                                        <td>{{ attachment.filename }}</td>
+                                        <td>{{ attachment.user.name }}</td>
+                                        <td>{{ attachment.upload_date.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm">
+                                                <a href="{{ url_for('view_attachment', attachment_id=attachment.id) }}" target="_blank" class="btn btn-info">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="{{ url_for('view_attachment', attachment_id=attachment.id, download='true') }}" class="btn btn-success">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                                {% if get_current_user().user_type == 'admin' or get_current_user().id == attachment.user_id or get_current_user().id == ticket.created_by_id %}
+                                                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteAttachmentModal" 
+                                                       data-attachment-id="{{ attachment.id }}" data-attachment-name="{{ attachment.filename }}">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="mt-4">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="text-muted mb-0">إضافة تعليق</h6>
+                            <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#addAttachmentModal">
+                                <i class="fas fa-paperclip"></i> إضافة مرفق
+                            </button>
+                        </div>
+                        <form method="POST" action="{{ url_for('add_comment', ticket_id=ticket.id) }}" enctype="multipart/form-data">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <div class="mb-3">
+                                <textarea class="form-control" name="content" rows="3" placeholder="أضف تعليقك هنا..." required></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label for="comment_attachments" class="form-label">مرفقات التعليق (اختياري)</label>
+                                <input type="file" class="form-control" id="comment_attachments" name="comment_attachments" multiple>
+                                <div class="form-text">يمكنك إرفاق ملفات مع التعليق (الحد الأقصى 2 ملفات)</div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-paper-plane me-2"></i>إرسال التعليق
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
-                
-                <!-- وصف المشكلة -->
-                <h6 class="fw-bold mb-2">وصف المشكلة:</h6>
-                <div class="p-3 bg-light rounded mb-4">
-                    {{ ticket.description | replace('\n', '<br>') | safe }}
+            </div>
+            
+            <!-- نموذج طلب الصيانة -->
+            {% if get_current_user().user_type in ['admin', 'maintenance'] or get_current_user().id == ticket.created_by_id %}
+            <div class="card mt-3">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">نموذج طلب الصيانة</h5>
                 </div>
-
-                <!-- المرفقات -->
-                {% if ticket.attachments.count() > 0 %}
-                <h6 class="fw-bold mb-2">المرفقات:</h6>
-                <div class="row mb-4">
-                    {% for attachment in ticket.attachments %}
-                    <div class="col-md-4 col-sm-6 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body text-center p-2">
-                                {% if attachment.file_type and attachment.file_type.startswith('image/') %}
-                                    <a href="javascript:void(0)" 
-                                       data-url="{{ url_for('view_attachment', attachment_id=attachment.id) }}"
-                                       data-type="{{ attachment.file_type }}"
-                                       data-filename="{{ attachment.filename }}"
-                                       class="preview-attachment-link d-block">
-                                        <img src="{{ url_for('view_attachment', attachment_id=attachment.id) }}" 
-                                             alt="{{ attachment.filename }}" 
-                                             class="img-fluid attachment-thumbnail mb-2" 
-                                             style="max-height: 120px;">
-                                    </a>
-                                {% elif attachment.file_type and 'pdf' in attachment.file_type %}
-                                    <a href="javascript:void(0)" 
-                                       data-url="{{ url_for('view_attachment', attachment_id=attachment.id) }}"
-                                       data-type="{{ attachment.file_type }}"
-                                       data-filename="{{ attachment.filename }}"
-                                       class="preview-attachment-link d-block">
-                                        <i class="fas fa-file-pdf fa-4x text-danger mb-2"></i>
-                                    </a>
-                                {% elif attachment.file_type and ('word' in attachment.file_type or 'document' in attachment.file_type) %}
-                                    <i class="fas fa-file-word fa-4x text-primary mb-2"></i>
-                                {% elif attachment.file_type and ('excel' in attachment.file_type or 'spreadsheet' in attachment.file_type) %}
-                                    <i class="fas fa-file-excel fa-4x text-success mb-2"></i>
-                                {% else %}
-                                    <i class="fas fa-file fa-4x text-secondary mb-2"></i>
-                                {% endif %}
-                                <p class="small text-truncate mb-1">{{ attachment.filename }}</p>
-                                <div class="btn-group btn-group-sm w-100">
-                                    <a href="{{ url_for('download_attachment', attachment_id=attachment.id) }}" class="btn btn-sm btn-outline-primary">
-                                        <i class="fas fa-download"></i> تحميل
-                                    </a>
-                                    <a href="javascript:void(0)" 
-                                       data-url="{{ url_for('view_attachment', attachment_id=attachment.id) }}"
-                                       data-type="{{ attachment.file_type }}"
-                                       data-filename="{{ attachment.filename }}"
-                                       class="preview-attachment-link btn btn-sm btn-outline-secondary">
-                                        <i class="fas fa-eye"></i> معاينة
-                                    </a>
+                <div class="card-body">
+                    <div class="d-grid">
+                        <a href="{{ url_for('generate_maintenance_form_pdf', ticket_id=ticket.id) }}" target="_blank" class="btn btn-info">
+                            <i class="fas fa-file-pdf me-2"></i>عرض نموذج طلب الصيانة
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="col-lg-4">
+            <!-- أدوات إدارة البلاغ -->
+            <div class="card mb-3">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">إدارة البلاغ</h5>
+                </div>
+                <div class="card-body">
+                    {% if get_current_user().user_type == 'admin' %}
+                    <form method="POST" action="{{ url_for('assign_ticket', ticket_id=ticket.id) }}" class="mb-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="maintenance_id" class="form-label">تعيين البلاغ إلى</label>
+                            <div class="input-group">
+                                <select class="form-select" name="maintenance_id" id="maintenance_id" required>
+                                    <option value="" selected disabled>اختر فني صيانة</option>
+                                    {% for tech in maintenance_staff %}
+                                    <option value="{{ tech.id }}" data-phone="{{ tech.phone }}" {{ 'selected' if ticket.assigned_to_id == tech.id else '' }}>{{ tech.name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="button" class="btn whatsapp-button" id="sendWhatsappToTech" title="إرسال تنبيه للفني عبر الواتساب">
+                                    <i class="fab fa-whatsapp"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-user-check me-2"></i>تعيين البلاغ
+                            </button>
+                        </div>
+                    </form>
+                    {% endif %}
+                    
+                    <!-- إذا كان البلاغ معين لفني بالفعل، أضف زر إرسال تنبيه إضافي -->
+                    {% if ticket.assignee %}
+                    <div class="mt-3 mb-3">
+                        <div class="d-grid">
+                            <button type="button" class="btn whatsapp-button" id="sendDirectWhatsappBtn" data-phone="{{ ticket.assignee.phone }}" data-name="{{ ticket.assignee.name }}">
+                                <i class="fab fa-whatsapp me-2"></i>إرسال تنبيه للفني المسؤول ({{ ticket.assignee.name }})
+                            </button>
+                        </div>
+                    </div>
+                    {% endif %}
+                    
+                    {% if get_current_user().user_type == 'admin' or (get_current_user().user_type == 'maintenance' and get_current_user().id == ticket.assigned_to_id) %}
+                    <form method="POST" action="{{ url_for('change_status', ticket_id=ticket.id) }}" class="mb-3">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for="status_id" class="form-label">تغيير الحالة</label>
+                            <select class="form-select" name="status_id" id="status_id" required>
+                                <option value="" selected disabled>اختر الحالة</option>
+                                {% for status in statuses %}
+                                <option value="{{ status.id }}" {{ 'selected' if ticket.status_id == status.id else '' }}>{{ status.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-warning">
+                                <i class="fas fa-sync-alt me-2"></i>تغيير الحالة
+                            </button>
+                        </div>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- التعليقات -->
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">التعليقات</h5>
+                </div>
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush card-ticket-comments">
+                        {% if comments %}
+                            {% for comment in comments %}
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span class="fw-bold">{{ comment.user.name }}</span>
+                                    <small class="text-muted">{{ comment.created_at.strftime('%Y-%m-%d %H:%M') }}</small>
                                 </div>
+                                <div class="mt-2">{{ comment.content | nl2br }}</div>
                             </div>
-                        </div>
+                            {% endfor %}
+                        {% else %}
+                            <div class="list-group-item text-center py-4">
+                                <i class="fas fa-comments text-muted mb-2 fs-1"></i>
+                                <p class="mb-0">لا توجد تعليقات حتى الآن</p>
+                            </div>
+                        {% endif %}
                     </div>
-                    {% endfor %}
-                </div>
-                {% endif %}
-
-                <!-- زر طباعة نموذج طلب الصيانة -->
-                <div class="d-grid gap-2 mt-4">
-                    <a href="{{ url_for('generate_maintenance_form_pdf', ticket_id=ticket.id) }}" class="btn btn-primary" target="_blank">
-                        <i class="fas fa-print me-2"></i>طباعة نموذج طلب الصيانة
-                    </a>
                 </div>
             </div>
         </div>
-        
-        <!-- التعليقات -->
-        <div class="card mb-4">
-            <div class="card-header bg-light">
-                <h5 class="mb-0">
-                    <i class="fas fa-comments me-2"></i>التعليقات
-                    <span class="badge bg-secondary ms-2">{{ comments | length }}</span>
-                </h5>
-            </div>
-            <div class="card-body">
-                {% if comments %}
-                    {% for comment in comments %}
-                    <div class="comment-box">
-                        <div class="comment-header">
-                            <div>
-                                <strong>{{ comment.user.name }}</strong>
-                                <span class="badge {% if comment.user.user_type == 'admin' %}bg-danger
-                                      {% elif comment.user.user_type == 'maintenance' %}bg-success
-                                      {% else %}bg-primary{% endif %} ms-2">
-                                    {% if comment.user.user_type == 'admin' %}
-                                        مدير
-                                    {% elif comment.user.user_type == 'maintenance' %}
-                                        فني
-                                    {% else %}
-                                        موظف
-                                    {% endif %}
-                                </span>
-                            </div>
-                            <div>{{ comment.created_at.strftime('%Y/%m/%d %H:%M') }}</div>
-                        </div>
-                        <div class="comment-content mt-2">
-                            {{ comment.content | replace('\n', '<br>') | safe }}
-                        </div>
-                    </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center py-4">
-                        <i class="fas fa-comments text-muted fa-3x mb-3"></i>
-                        <p>لا توجد تعليقات حتى الآن</p>
-                    </div>
-                {% endif %}
-                
-                <!-- تحديث نموذج إضافة تعليق -->
-                <form action="{{ url_for('add_comment', ticket_id=ticket.id) }}" method="POST" enctype="multipart/form-data">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label for="content" class="form-label">إضافة تعليق:</label>
-                        <textarea class="form-control" id="content" name="content" rows="3" required></textarea>
-                    </div>
-                    <div class="mb-3">
-                        <label for="comment_attachments" class="form-label">المرفقات (اختياري)</label>
-                        <input type="file" class="form-control" id="comment_attachments" name="comment_attachments" multiple>
-                        <div class="form-text">يمكنك إرفاق ملفات مع التعليق (الحد الأقصى 2 ملفات)</div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-paper-plane me-1"></i>إرسال
-                    </button>
-                </form>
-            </div>
-        </div>
-    </div>
-    
-    <!-- الإجراءات والمعلومات الإضافية -->
-    <div class="col-md-4">
-        <!-- الإجراءات -->
-        {% set current_user = get_current_user() %}
-        
-        {% if current_user.user_type == 'admin' %}
-        <!-- تعيين فني صيانة (للمدير فقط) -->
-        <div class="card mb-4">
-            <div class="card-header bg-info text-white">
-                <h5 class="mb-0"><i class="fas fa-user-cog me-2"></i>تعيين فني</h5>
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('assign_ticket', ticket_id=ticket.id) }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label for="maintenance_id" class="form-label">اختر فني الصيانة:</label>
-                        <select class="form-select" id="maintenance_id" name="maintenance_id" required>
-                            <option value="" selected disabled>-- اختر فني الصيانة --</option>
-                            {% for staff in maintenance_staff %}
-                            <option value="{{ staff.id }}" {% if ticket.assigned_to_id == staff.id %}selected{% endif %}>
-                                {{ staff.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-user-plus me-1"></i>تعيين
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        {% endif %}
-        
-        {% if current_user.user_type == 'maintenance' and current_user.id == ticket.assigned_to_id or current_user.user_type == 'admin' %}
-        <!-- تحديث الحالة (للفني أو المدير) -->
-        <div class="card mb-4">
-            <div class="card-header bg-warning text-dark">
-                <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>تحديث الحالة</h5>
-            </div>
-            <div class="card-body">
-                <form action="{{ url_for('change_status', ticket_id=ticket.id) }}" method="POST">
-                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-                    <div class="mb-3">
-                        <label for="status_id" class="form-label">الحالة الجديدة:</label>
-                        <select class="form-select" id="status_id" name="status_id" required>
-                            {% for status in statuses %}
-                            <option value="{{ status.id }}" {% if ticket.status_id == status.id %}selected{% endif %}>
-                                {{ status.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div class="d-grid">
-                        <button type="submit" class="btn btn-warning text-dark">
-                            <i class="fas fa-sync-alt me-1"></i>تحديث الحالة
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-        {% endif %}
-        
-        <!-- معلومات زمنية -->
-        <div class="card mb-4">
-            <div class="card-header bg-secondary text-white">
-                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>معلومات زمنية</h5>
-            </div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        تاريخ الإنشاء
-                        <span>{{ ticket.created_at.strftime('%Y/%m/%d %H:%M') }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        آخر تحديث
-                        <span>{{ ticket.updated_at.strftime('%Y/%m/%d %H:%M') }}</span>
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        الموعد النهائي
-                        {% if ticket.due_date %}
-                            <span class="{% if ticket.is_overdue() %}text-danger fw-bold{% endif %}">
-                                {{ ticket.due_date.strftime('%Y/%m/%d %H:%M') }}
-                                {% if ticket.is_overdue() %}
-                                    <i class="fas fa-exclamation-triangle ms-1"></i>
-                                {% endif %}
-                            </span>
-                        {% else %}
-                            <span class="text-muted">غير محدد</span>
-                        {% endif %}
-                    </li>
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        وقت الاستجابة
-                        {% if "خلال" in ticket.priority.name %}
-                            <span>{{ (ticket.priority.response_time / 24)|round|int }} يوم</span>
-                        {% else %}
-                            <span>{{ ticket.priority.response_time }} ساعة</span>
-                        {% endif %}
-                    </li>
-                </ul>
-            </div>
-        </div>
-
-        <!-- معلومات المستفيد -->
-        {% if ticket.beneficiary %}
-        <div class="card mb-4">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0"><i class="fas fa-user me-2"></i>معلومات المستفيد</h5>
-            </div>
-            <div class="card-body">
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        الاسم
-                        <span>{{ ticket.beneficiary.name }}</span>
-                    </li>
-                    {% if ticket.beneficiary.department %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        الإدارة
-                        <span>{{ ticket.beneficiary.department }}</span>
-                    </li>
-                    {% endif %}
-                    {% if ticket.beneficiary.position %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        المنصب
-                        <span>{{ ticket.beneficiary.position }}</span>
-                    </li>
-                    {% endif %}
-                    {% if ticket.beneficiary.phone %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        رقم الهاتف
-                        <span>{{ ticket.beneficiary.phone }}</span>
-                    </li>
-                    {% endif %}
-                    {% if ticket.beneficiary.email %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        البريد الإلكتروني
-                        <span>{{ ticket.beneficiary.email }}</span>
-                    </li>
-                    {% endif %}
-                </ul>
-            </div>
-        </div>
-        {% endif %}
     </div>
 </div>
 
-<!-- نافذة معاينة المرفقات -->
-<div class="modal fade" id="attachmentPreviewModal" tabindex="-1" aria-labelledby="attachmentPreviewModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+<!-- Modal: تعديل البلاغ -->
+<div class="modal fade" id="editTicketModal" tabindex="-1" aria-labelledby="editTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="attachmentPreviewModalLabel">معاينة المرفق</h5>
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="editTicketModalLabel">تعديل البلاغ</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
             </div>
-            <div class="modal-body text-center" id="attachmentPreviewContent">
-                <!-- سيتم عرض محتوى المرفق هنا -->
+            <div class="modal-body">
+                <form id="editTicketForm" method="POST" action="{{ url_for('edit_ticket', ticket_id=ticket.id) }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    
+                    <!-- طريقة استلام البلاغ -->
+                    <div class="mb-3">
+                        <label class="form-label">طريقة استلام البلاغ</label>
+                        <div class="contact-method-simple">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="contact_method" id="edit_contact_method1" value="حضور شخصي" required {{ 'checked' if ticket.contact_method == 'حضور شخصي' or not ticket.contact_method else '' }}>
+                                <label class="form-check-label" for="edit_contact_method1">
+                                    <i class="fas fa-user me-1"></i> حضور شخصي
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="contact_method" id="edit_contact_method2" value="بريد إلكتروني" required {{ 'checked' if ticket.contact_method == 'بريد إلكتروني' else '' }}>
+                                <label class="form-check-label" for="edit_contact_method2">
+                                    <i class="fas fa-envelope me-1"></i> بريد إلكتروني
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="contact_method" id="edit_contact_method3" value="واتساب" required {{ 'checked' if ticket.contact_method == 'واتساب' else '' }}>
+                                <label class="form-check-label" for="edit_contact_method3">
+                                    <i class="fab fa-whatsapp me-1"></i> واتساب
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="contact_method" id="edit_contact_method4" value="اتصال" required {{ 'checked' if ticket.contact_method == 'اتصال' else '' }}>
+                                <label class="form-check-label" for="edit_contact_method4">
+                                    <i class="fas fa-phone me-1"></i> اتصال
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_department_id" class="form-label">الإدارة</label>
+                            <select class="form-select" id="edit_department_id" name="department_id">
+                                <option value="">-- اختر الإدارة --</option>
+                                {% for department in departments %}
+                                <option value="{{ department.id }}" {{ 'selected' if ticket.department_id == department.id else '' }}>{{ department.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="edit_section_id" class="form-label">القسم</label>
+                            <select class="form-select" id="edit_section_id" name="section_id">
+                                <option value="">-- اختر القسم --</option>
+                                {% if ticket.department and ticket.department.sections %}
+                                    {% for section in ticket.department.sections %}
+                                    <option value="{{ section.id }}" {{ 'selected' if ticket.section_id == section.id else '' }}>{{ section.name }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_category_id" class="form-label">التصنيف</label>
+                            <select class="form-select" id="edit_category_id" name="category_id" required>
+                                <option value="" disabled>-- اختر التصنيف --</option>
+                                {% for category in categories %}
+                                <option value="{{ category.id }}" {{ 'selected' if ticket.category_id == category.id else '' }}>{{ category.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label for="edit_subcategory_id" class="form-label">التصنيف الفرعي</label>
+                            <select class="form-select" id="edit_subcategory_id" name="subcategory_id">
+                                <option value="">-- اختر التصنيف الفرعي --</option>
+                                {% if ticket.category and ticket.category.subcategories %}
+                                    {% for subcategory in ticket.category.subcategories %}
+                                    <option value="{{ subcategory.id }}" {{ 'selected' if ticket.subcategory_id == subcategory.id else '' }}>{{ subcategory.name }}</option>
+                                    {% endfor %}
+                                {% endif %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="edit_priority_id" class="form-label">الأولوية</label>
+                            <select class="form-select" id="edit_priority_id" name="priority_id" required>
+                                <option value="" disabled>-- اختر الأولوية --</option>
+                                {% for priority in priorities %}
+                                <option value="{{ priority.id }}" {{ 'selected' if ticket.priority_id == priority.id else '' }}>{{ priority.name }} ({{ priority.response_time }} ساعة)</option>
+                                {% endfor %}
+                                <option value="0" {{ 'selected' if ticket.priority.is_custom else '' }}>بوقت محدد</option>
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 custom-priority-container" id="edit_custom_priority_container">
+                            <label for="edit_custom_priority" class="form-label">خلال كم يوم</label>
+                            <select class="form-select" id="edit_custom_priority" name="custom_priority">
+                                <option value="" disabled>-- اختر عدد الأيام --</option>
+                                {% for day in range(1, 31) %}
+                                <option value="{{ day }}" {{ 'selected' if ticket.priority.is_custom and ticket.priority.response_time // 24 == day else '' }}>{{ day }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">وصف المشكلة</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="5" required>{{ ticket.description }}</textarea>
+                    </div>
+                    
+                    {% if ticket.beneficiary %}
+                    <div class="mb-3">
+                        <label for="edit_beneficiary_name" class="form-label">المستفيد</label>
+                        <input type="text" class="form-control" id="edit_beneficiary_name" value="{{ ticket.beneficiary.name }}" readonly>
+                        <input type="hidden" id="edit_beneficiary_id" name="beneficiary_id" value="{{ ticket.beneficiary_id }}">
+                    </div>
+                    {% endif %}
+                </form>
             </div>
             <div class="modal-footer">
-                <a href="#" class="btn btn-primary" id="attachmentDownloadLink">
-                    <i class="fas fa-download me-1"></i>تحميل
-                </a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" form="editTicketForm" class="btn btn-primary">حفظ التغييرات</button>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal: إضافة مرفق -->
+<div class="modal fade" id="addAttachmentModal" tabindex="-1" aria-labelledby="addAttachmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addAttachmentModalLabel">إضافة مرفق</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <form method="POST" action="{{ url_for('upload_attachment', ticket_id=ticket.id) }}" enctype="multipart/form-data" id="attachmentForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="mb-3">
+                        <label for="attachment" class="form-label">اختر ملف</label>
+                        <input type="file" class="form-control" id="attachment" name="attachment" required>
+                        <div class="form-text">الملفات المسموح بها: PDF, PNG, JPG, GIF, DOC, DOCX, XLS, XLSX, TXT</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" form="attachmentForm" class="btn btn-primary">رفع المرفق</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: حذف مرفق -->
+<div class="modal fade" id="deleteAttachmentModal" tabindex="-1" aria-labelledby="deleteAttachmentModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteAttachmentModalLabel">حذف مرفق</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <p>هل أنت متأكد أنك تريد حذف المرفق: <span id="attachmentToDelete"></span>؟</p>
+                <p class="text-danger">هذا الإجراء لا يمكن التراجع عنه!</p>
+                <form method="POST" id="deleteAttachmentForm">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="submit" form="deleteAttachmentForm" class="btn btn-danger">حذف</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
-<script type="text/javascript">
-document.addEventListener('DOMContentLoaded', function() {
-    // تطبيق ألوان الأولويات
-    document.querySelectorAll('.priority-badge').forEach(badge => {
-        badge.style.backgroundColor = ticketData.priorityColor;
-    });
-    
-    // إضافة معالج حدث لروابط المعاينة
-    document.querySelectorAll('.preview-attachment-link').forEach(link => {
-        link.addEventListener('click', function() {
-            const url = this.getAttribute('data-url');
-            const type = this.getAttribute('data-type');
-            const filename = this.getAttribute('data-filename');
-            previewAttachment(url, type, filename);
-        });
-    });
-});
-
-// دالة لعرض المرفق
-function previewAttachment(url, type, filename) {
-    const previewContent = document.getElementById('attachmentPreviewContent');
-    const modalTitle = document.getElementById('attachmentPreviewModalLabel');
-    const downloadLink = document.getElementById('attachmentDownloadLink');
-    
-    // تعيين عنوان النافذة
-    modalTitle.textContent = filename;
-    
-    // تعيين رابط التحميل
-    downloadLink.href = url + '?download=true';
-    
-    // تفريغ محتوى المعاينة
-    previewContent.innerHTML = '';
-    
-    // عرض المرفق حسب نوعه
-    if (type && type.startsWith('image/')) {
-        // إذا كان صورة
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = filename;
-        img.className = 'img-fluid';
-        img.style.maxHeight = '70vh';
-        previewContent.appendChild(img);
-    } else if (type && type.includes('pdf')) {
-        // إذا كان PDF
-        const embed = document.createElement('embed');
-        embed.src = url;
-        embed.type = 'application/pdf';
-        embed.style.width = '100%';
-        embed.style.height = '70vh';
-        previewContent.appendChild(embed);
-    } else {
-        // إذا كان نوع آخر لا يمكن معاينته
-        const icon = document.createElement('i');
-        
-        if (type && type.includes('word')) {
-            icon.className = 'fas fa-file-word fa-5x text-primary mb-3';
-        } else if (type && type.includes('document')) {
-            icon.className = 'fas fa-file-word fa-5x text-primary mb-3';
-        } else if (type && type.includes('excel')) {
-            icon.className = 'fas fa-file-excel fa-5x text-success mb-3';
-        } else if (type && type.includes('spreadsheet')) {
-            icon.className = 'fas fa-file-excel fa-5x text-success mb-3';
-        } else if (type && type.includes('zip')) {
-            icon.className = 'fas fa-file-archive fa-5x text-warning mb-3';
-        } else if (type && type.includes('compressed')) {
-            icon.className = 'fas fa-file-archive fa-5x text-warning mb-3';
-        } else {
-            icon.className = 'fas fa-file fa-5x text-secondary mb-3';
-        }
-        
-        previewContent.appendChild(icon);
-        
-        const message = document.createElement('p');
-        message.textContent = 'لا يمكن معاينة هذا النوع من الملفات. يرجى تحميل الملف لفتحه.';
-        previewContent.appendChild(message);
-    }
-    
-    // فتح النافذة
-    const previewModal = new bootstrap.Modal(document.getElementById('attachmentPreviewModal'));
-    previewModal.show();
-}
-</script>
+<!-- تحميل ملف JavaScript الخاص بصفحة البلاغ -->
+<script src="{{ url_for('static', filename='js/ticket_page.js') }}"></script>
 {% endblock %}

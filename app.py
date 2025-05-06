@@ -6,15 +6,12 @@ Fixltpro - نظام بلاغات الدعم الفني - تطبيق Flask مع S
 """
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, jsonify, make_response
-from flask_sqlalchemy import SQLAlchemy # type: ignore
-from flask_wtf import CSRFProtect  # type: ignore # إضافة حماية CSRF
-from flask_wtf import FlaskForm  # type: ignore # استيراد FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, validators  # type: ignore # استيراد حقول النموذج
-from werkzeug.security import generate_password_hash, check_password_hash
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, BooleanField, validators
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
-from fpdf import FPDF # type: ignore
+from fpdf import FPDF
 import arabic_reshaper
 from bidi.algorithm import get_display
 import io
@@ -22,8 +19,12 @@ import os
 import openpyxl
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment
-import io
 
+# استيراد النماذج من ملف models.py - إضافة جديدة
+from models import db, User, Ticket, TicketPriority, TicketStatus, Category, SubCategory, Department, Section, Attachment, Comment, Beneficiary
+
+# استيراد واجهات API من api_routes.py - إضافة جديدة
+from api_routes import api as api_blueprint, csrf
 
 # إنشاء تطبيق Flask
 app = Flask(__name__)
@@ -34,12 +35,21 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'fixltpro.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# إنشاء حماية CSRF
-csrf = CSRFProtect(app)
+# تهيئة قاعدة البيانات
+db.init_app(app)
 
-# إنشاء قاعدة البيانات
-db = SQLAlchemy(app)
+# تهيئة csrf
+csrf.init_app(app)
 
+# تسجيل Blueprint للواجهات البرمجية
+app.register_blueprint(api_blueprint, url_prefix='/api')
+
+# إضافة فلتر nl2br لتحويل الأسطر الجديدة إلى <br>
+@app.template_filter('nl2br')
+def nl2br_filter(text):
+    if text:
+        return text.replace('\n', '<br>')
+    return ''
 
 # إعداد مسار المرفقات
 UPLOAD_FOLDER = os.path.join(basedir, 'uploads')
@@ -56,49 +66,48 @@ def allowed_file(filename):
     """التحقق من امتداد الملف"""
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# تعريف نماذج قاعدة البيانات
-class User(db.Model):
-    """نموذج المستخدم"""
-    __tablename__ = 'users'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    name = db.Column(db.String(100), nullable=False)
-    user_type = db.Column(db.String(20), nullable=False)  # admin, employee, maintenance
-    email = db.Column(db.String(100))  # إضافة حقل البريد الإلكتروني
-    phone = db.Column(db.String(20))  # إضافة حقل رقم الهاتف
-    
-    tickets_created = db.relationship('Ticket', backref='creator', lazy='dynamic', 
-                                     foreign_keys='Ticket.created_by_id')
-    tickets_assigned = db.relationship('Ticket', backref='assignee', lazy='dynamic',
-                                      foreign_keys='Ticket.assigned_to_id')
-    
-    @property
-    def password(self):
-        raise AttributeError('كلمة المرور غير قابلة للقراءة')
-    
-    @password.setter
-    def password(self, password):
-        self.password_hash = generate_password_hash(password)
-    
-    def verify_password(self, password):
-        return check_password_hash(self.password_hash, password)
+# مزخرفات للتحقق من تسجيل الدخول والصلاحيات
+def login_required(user_type=None):
+    """التحقق من تسجيل الدخول والصلاحيات"""
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if 'user_id' not in session:
+                flash('يرجى تسجيل الدخول أولاً', 'error')
+                return redirect(url_for('login'))
+            
+            user = User.query.get(session['user_id'])
+            if not user:
+                session.pop('user_id', None)
+                flash('يرجى تسجيل الدخول مرة أخرى', 'error')
+                return redirect(url_for('login'))
+            
+            if user_type and user.user_type != user_type and user.user_type != 'admin':
+                flash('ليس لديك صلاحية للوصول إلى هذه الصفحة', 'error')
+                return redirect(url_for('index'))
+            
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
 
 
-class TicketPriority(db.Model):
-    """نموذج أولوية البلاغ"""
-    __tablename__ = 'priorities'
+def calculate_due_date(priority_id):
+    """حساب الموعد النهائي بناءً على الأولوية"""
+    priority = TicketPriority.query.get(priority_id)
+    if not priority:
+        return None
     
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False)
-    response_time = db.Column(db.Integer)  # وقت الاستجابة بالساعات
-    color = db.Column(db.String(7))  # لون HTML مثل #FF0000
-    is_custom = db.Column(db.Boolean, default=False)  # هل هذه أولوية بوقت محدد؟
-    
-    tickets = db.relationship('Ticket', backref='priority', lazy='dynamic')
+    return datetime.utcnow() + timedelta(hours=priority.response_time)
 
-# إضافة الدالة التالية في app.py للتأكد من وجود أولوية "بوقت محدد"
+
+def get_current_user():
+    """الحصول على المستخدم الحالي"""
+    if 'user_id' in session:
+        return User.query.get(session['user_id'])
+    return None
+
+
+# إضافة الدالة التالية للتأكد من وجود أولوية "بوقت محدد"
 def ensure_custom_priority_exists():
     """التأكد من وجود أولوية خاصة للوقت المحدد"""
     custom_priority = TicketPriority.query.filter_by(is_custom=True).first()
@@ -114,144 +123,11 @@ def ensure_custom_priority_exists():
         db.session.commit()
     return custom_priority
 
-
-class TicketStatus(db.Model):
-    """نموذج حالة البلاغ"""
-    __tablename__ = 'statuses'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(50), nullable=False)
-    
-    tickets = db.relationship('Ticket', backref='status', lazy='dynamic')
-
-
-class Category(db.Model):
-    """نموذج تصنيف البلاغ"""
-    __tablename__ = 'categories'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    
-    tickets = db.relationship('Ticket', backref='category', lazy='dynamic')
-    subcategories = db.relationship('SubCategory', backref='parent_category', lazy='dynamic', cascade='all, delete-orphan')
-
-class SubCategory(db.Model):
-    """نموذج التصنيف الفرعي للبلاغ"""
-    __tablename__ = 'subcategories'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
-    
-    tickets = db.relationship('Ticket', backref='subcategory', lazy='dynamic')
-
-
-class Department(db.Model):
-    """نموذج الإدارات"""
-    __tablename__ = 'departments'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    
-    # العلاقة مع الأقسام
-    sections = db.relationship('Section', backref='department', lazy='dynamic', cascade='all, delete-orphan')
-    tickets = db.relationship('Ticket', backref='department', lazy='dynamic')
-
-
-class Section(db.Model):
-    """نموذج الأقسام"""
-    __tablename__ = 'sections'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'), nullable=False)
-    
-    tickets = db.relationship('Ticket', backref='section', lazy='dynamic')
-    
-# تعديل نموذج البلاغ لإضافة حقل المستفيد
-class Ticket(db.Model):
-    """نموذج البلاغ"""
-    __tablename__ = 'tickets'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(100))  # جعلها اختيارية
-    description = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    due_date = db.Column(db.DateTime)
-    
-    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    assigned_to_id = db.Column(db.Integer, db.ForeignKey('users.id'))
-    category_id = db.Column(db.Integer, db.ForeignKey('categories.id'), nullable=False)
-    subcategory_id = db.Column(db.Integer, db.ForeignKey('subcategories.id'))
-    department_id = db.Column(db.Integer, db.ForeignKey('departments.id'))
-    section_id = db.Column(db.Integer, db.ForeignKey('sections.id'))
-    priority_id = db.Column(db.Integer, db.ForeignKey('priorities.id'), nullable=False)
-    status_id = db.Column(db.Integer, db.ForeignKey('statuses.id'), nullable=False)
-    beneficiary_id = db.Column(db.Integer, db.ForeignKey('beneficiaries.id'))  # إضافة حقل المستفيد
-    
-    comments = db.relationship('Comment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
-    attachments = db.relationship('Attachment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
-
-
-    def is_overdue(self):
-        """التحقق مما إذا كان البلاغ متأخراً"""
-        if not self.due_date:
-            return False
-        return datetime.utcnow() > self.due_date
-
-
-
-class Attachment(db.Model):
-    """نموذج المرفقات"""
-    __tablename__ = 'attachments'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    file_path = db.Column(db.String(255), nullable=False)
-    file_type = db.Column(db.String(50))  # نوع الملف (صورة، PDF، إلخ)
-    upload_date = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # إضافة علاقة مع المستخدم الذي قام برفع الملف
-    
-    # إضافة علاقة مع المستخدم
-    user = db.relationship('User', backref='attachments')
-
-
-class Comment(db.Model):
-    """نموذج التعليقات على البلاغات"""
-    __tablename__ = 'comments'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    
-    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    
-    user = db.relationship('User', backref='comments')
-
-
 # تعريف نموذج تسجيل الدخول
 class LoginForm(FlaskForm):
     username = StringField('اسم المستخدم', validators=[validators.DataRequired()])
     password = PasswordField('كلمة المرور', validators=[validators.DataRequired()])
     remember = BooleanField('تذكرني')
-
-
-class Beneficiary(db.Model):
-    """نموذج المستفيد"""
-    __tablename__ = 'beneficiaries'
-    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    phone = db.Column(db.String(20))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # إضافة علاقة مع البلاغات
-    tickets = db.relationship('Ticket', backref='beneficiary', lazy='dynamic')
 
 
 # مزخرفات للتحقق من تسجيل الدخول والصلاحيات
@@ -475,7 +351,6 @@ def assign_ticket(ticket_id):
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 
-# تعديل create_ticket لدعم اختيار المستفيد
 @app.route('/ticket/create', methods=['GET', 'POST'])
 @login_required('employee')
 def create_ticket():
@@ -497,6 +372,9 @@ def create_ticket():
         assigned_to_id = request.form.get('assigned_to_id')  # معرف فني الصيانة المعين
         custom_priority = request.form.get('custom_priority') # المدة المخصصة بالأيام
         beneficiary_id = request.form.get('beneficiary_id')  # معرف المستفيد
+        
+        # إضافة طريقة استلام البلاغ
+        contact_method = request.form.get('contact_method')
         
         # تحويل القيم إلى None إذا كانت '0' أو فارغة
         if subcategory_id in ['0', '', None]:
@@ -524,7 +402,7 @@ def create_ticket():
         else:
             beneficiary_id = int(beneficiary_id)
         
-        if not all([description, category_id]):
+        if not all([description, category_id, contact_method]):  # إضافة التحقق من طريقة الاستلام
             flash('يرجى ملء جميع الحقول المطلوبة', 'error')
             return render_template('create_ticket.html', 
                                   categories=categories, 
@@ -594,7 +472,8 @@ def create_ticket():
             assigned_to_id=assigned_to_id,  # تعيين الفني المسؤول
             status_id=status.id,
             due_date=due_date,
-            beneficiary_id=beneficiary_id  # تعيين المستفيد
+            beneficiary_id=beneficiary_id,  # تعيين المستفيد
+            contact_method=contact_method  # إضافة طريقة استلام البلاغ
         )
         
         db.session.add(ticket)
@@ -636,6 +515,19 @@ def create_ticket():
                 user_id=session['user_id']
             )
             db.session.add(comment)
+            
+            # إرسال تنبيه عبر واتساب إذا تم تحديد ذلك
+            send_whatsapp = request.form.get('send_whatsapp_notification') == 'on'
+            if send_whatsapp:
+                tech = User.query.get(assigned_to_id)
+                if tech and tech.phone:
+                    # إضافة تعليق يفيد بمحاولة إرسال تنبيه واتساب
+                    whatsapp_comment = Comment(
+                        content=f"تم إرسال تنبيه عبر واتساب إلى {tech_name} عن البلاغ الجديد.",
+                        ticket_id=ticket.id,
+                        user_id=session['user_id']
+                    )
+                    db.session.add(whatsapp_comment)
         
         db.session.commit()
         
@@ -665,6 +557,119 @@ def create_ticket():
     response.headers['Expires'] = '-1'
     
     return response
+
+@app.route('/ticket/<int:ticket_id>/edit', methods=['POST'])
+@login_required()
+def edit_ticket(ticket_id):
+    """تعديل بيانات البلاغ"""
+    ticket = Ticket.query.get_or_404(ticket_id)
+    current_user = get_current_user()
+    
+    # التحقق من الصلاحيات - يمكن للمدير أو منشئ البلاغ تعديله
+    if current_user.user_type != 'admin' and current_user.id != ticket.created_by_id:
+        flash('ليس لديك صلاحية لتعديل هذا البلاغ', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+    
+    # جمع بيانات النموذج
+    description = request.form.get('description')
+    category_id = request.form.get('category_id', type=int)
+    subcategory_id = request.form.get('subcategory_id')
+    department_id = request.form.get('department_id')
+    section_id = request.form.get('section_id')
+    priority_id = request.form.get('priority_id')
+    custom_priority = request.form.get('custom_priority')
+    
+    # إضافة طريقة استلام البلاغ
+    contact_method = request.form.get('contact_method')
+    
+    # التحويل إلى None إذا كانت القيم فارغة
+    if subcategory_id in ['', '0', None]:
+        subcategory_id = None
+    else:
+        subcategory_id = int(subcategory_id)
+    
+    if department_id in ['', '0', None]:
+        department_id = None
+    else:
+        department_id = int(department_id)
+    
+    if section_id in ['', '0', None]:
+        section_id = None
+    else:
+        section_id = int(section_id)
+    
+    # التحقق من وجود البيانات الإلزامية
+    if not all([description, category_id, contact_method]):  # إضافة التحقق من طريقة الاستلام
+        flash('يرجى ملء جميع الحقول المطلوبة', 'error')
+        return redirect(url_for('view_ticket', ticket_id=ticket_id))
+    
+    # معالجة الأولوية المخصصة
+    if priority_id == '0' and custom_priority:
+        # التأكد من وجود أولوية بوقت محدد
+        custom_priority_obj = ensure_custom_priority_exists()
+        
+        # تعيين أولوية البلاغ إلى "بوقت محدد"
+        priority_id = custom_priority_obj.id
+        
+        # حساب الموعد النهائي بناءً على عدد الأيام المحددة
+        custom_days = int(custom_priority)
+        custom_hours = custom_days * 24
+        due_date = datetime.utcnow() + timedelta(hours=custom_hours)
+    else:
+        priority_id = int(priority_id)
+        # حساب الموعد النهائي بناءً على الأولوية المحددة
+        due_date = calculate_due_date(priority_id)
+    
+    # تحديث بيانات البلاغ
+    old_category = ticket.category.name if ticket.category else None
+    old_priority = ticket.priority.name if ticket.priority else None
+    old_contact_method = ticket.contact_method  # حفظ طريقة الاستلام السابقة للتعليق
+    
+    ticket.description = description
+    ticket.category_id = category_id
+    ticket.subcategory_id = subcategory_id
+    ticket.department_id = department_id
+    ticket.section_id = section_id
+    ticket.priority_id = priority_id
+    ticket.due_date = due_date
+    ticket.contact_method = contact_method  # تحديث طريقة استلام البلاغ
+    
+    # إنشاء عنوان افتراضي للبلاغ إذا لم يتم توفيره
+    auto_title = f"{Category.query.get(category_id).name}"
+    if subcategory_id:
+        auto_title += f" - {SubCategory.query.get(subcategory_id).name}"
+    if department_id:
+        auto_title += f" - {Department.query.get(department_id).name}"
+        if section_id:
+            auto_title += f" - {Section.query.get(section_id).name}"
+            
+    ticket.title = auto_title
+    
+    db.session.commit()
+    
+    # إضافة تعليق تلقائي عن التعديل
+    changes = []
+    if old_category != ticket.category.name:
+        changes.append(f"التصنيف من '{old_category}' إلى '{ticket.category.name}'")
+    
+    if old_priority != ticket.priority.name:
+        changes.append(f"الأولوية من '{old_priority}' إلى '{ticket.priority.name}'")
+    
+    if old_contact_method != contact_method:
+        changes.append(f"طريقة الاستلام من '{old_contact_method or 'غير محدد'}' إلى '{contact_method}'")
+    
+    if changes:
+        changes_text = "تم تعديل: " + "، ".join(changes)
+        comment = Comment(
+            content=f"تم تعديل بيانات البلاغ بواسطة {current_user.name}. {changes_text}",
+            ticket_id=ticket_id,
+            user_id=current_user.id
+        )
+        db.session.add(comment)
+        db.session.commit()
+    
+    flash('تم تحديث البلاغ بنجاح', 'success')
+    return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 @app.route('/search_ticket')
 @login_required()

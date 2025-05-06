@@ -1,0 +1,280 @@
+/**
+ * ticket_styles.css
+ * أنماط مشتركة لصفحات البلاغات في نظام Fixltpro
+ */
+
+/* ===== تنسيقات عامة ===== */
+.card {
+    border: none;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+}
+
+.card-header {
+    font-weight: 600;
+    padding: 0.75rem 1.25rem;
+}
+
+.text-muted {
+    color: #6c757d !important;
+}
+
+/* ===== تنسيقات خيارات طريقة استلام البلاغ ===== */
+.contact-method-container {
+    margin-bottom: 1.5rem;
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    border: 1px solid #e9ecef;
+}
+
+.contact-method-container .form-label {
+    font-weight: bold;
+    margin-bottom: 0.75rem;
+    display: block;
+    color: #495057;
+}
+
+.contact-method-option {
+    padding: 0.75rem;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    margin-bottom: 0.5rem;
+    transition: all 0.2s ease-in-out;
+    display: inline-flex;
+    align-items: center;
+    position: relative;
+    border: 2px solid transparent;
+    background-color: white;
+    width: calc(50% - 0.5rem);
+    margin-left: 0.5rem;
+}
+
+.contact-method-option:hover {
+    background-color: #e9ecef;
+}
+
+.contact-method-option.active {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.contact-method-option input {
+    position: absolute;
+    opacity: 0;
+}
+
+.contact-method-option label {
+    font-weight: 500;
+    margin-bottom: 0;
+    cursor: pointer;
+    width: 100%;
+    text-align: center;
+}
+
+.contact-method-option .icon {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 1.25rem;
+    width: 24px;
+    text-align: center;
+}
+
+/* خيارات طريقة استلام البلاغ بالنسخة المبسطة */
+.contact-method-simple {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.contact-method-simple .form-check {
+    background-color: #f8f9fa;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+    transition: all 0.2s ease;
+    width: calc(50% - 0.5rem);
+}
+
+.contact-method-simple .form-check:hover {
+    background-color: #e9ecef;
+}
+
+.contact-method-simple .form-check-input:checked + .form-check-label {
+    color: #0d6efd;
+    font-weight: 500;
+}
+
+.contact-method-simple .form-check-input:checked ~ .form-check {
+    border-color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+/* ===== تنسيقات صفحة عرض البلاغ ===== */
+.ticket-info-table {
+    margin-bottom: 0;
+}
+
+.ticket-info-table th {
+    width: 35%;
+    font-weight: 600;
+    vertical-align: middle;
+}
+
+.ticket-info-table td {
+    vertical-align: middle;
+}
+
+.ticket-due-date {
+    display: flex;
+    align-items: center;
+}
+
+.priority-badge, .status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 50rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+}
+
+/* ألوان الأولويات */
+.priority-badge.high {
+    background-color: #dc3545;
+    color: white;
+}
+
+.priority-badge.medium {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.priority-badge.low {
+    background-color: #28a745;
+    color: white;
+}
+
+.priority-badge.custom {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* ألوان الحالات */
+.status-badge.new {
+    background-color: #0d6efd;
+    color: white;
+}
+
+.status-badge.in-progress {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.status-badge.completed {
+    background-color: #28a745;
+    color: white;
+}
+
+.status-badge.closed {
+    background-color: #6c757d;
+    color: white;
+}
+
+.status-badge.other {
+    background-color: #6610f2;
+    color: white;
+}
+
+/* وصف المشكلة */
+.ticket-description {
+    white-space: pre-line;
+    border-radius: 0.5rem;
+    background-color: #f8f9fa;
+    padding: 1rem;
+    font-size: 0.95rem;
+    color: #495057;
+    line-height: 1.7;
+}
+
+/* التعليقات */
+.card-ticket-comments {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.card-ticket-comments .list-group-item {
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    transition: background-color 0.2s;
+}
+
+.card-ticket-comments .list-group-item:hover {
+    background-color: #f8f9fa;
+}
+
+.card-ticket-comments .list-group-item:last-child {
+    border-bottom: none;
+}
+
+/* زر الواتساب */
+.whatsapp-button {
+    background-color: #25d366;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.whatsapp-button:hover {
+    background-color: #128c7e;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 3px 5px rgba(0, 0, 0, 0.2);
+}
+
+/* تنسيقات جدول المرفقات */
+.ticket-attachments-table th, .ticket-attachments-table td {
+    vertical-align: middle;
+}
+
+/* التنسيقات الخاصة بأولوية مخصصة */
+.custom-priority-container {
+    display: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.custom-priority-container.visible {
+    display: block;
+    opacity: 1;
+}
+
+/* تصحيح بعض المشاكل في RTL */
+.modal-header .btn-close {
+    margin: -0.5rem auto -0.5rem -0.5rem;
+}
+
+.fw-bold {
+    font-weight: 600 !important;
+}
+
+.badge {
+    position: relative;
+    top: -1px;
+}
+
+/* تحسين المظهر للشاشات المتوسطة والصغيرة */
+@media (max-width: 991.98px) {
+    .ticket-info-table th {
+        width: 40%;
+    }
+}
+
+@media (max-width: 767.98px) {
+    .ticket-info-table th {
+        width: 45%;
+    }
+    
+    .contact-method-simple .form-check {
+        width: 100%;
+    }
+}
