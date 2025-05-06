@@ -31,6 +31,19 @@
                         </div>
                     </div>
                     
+                    <!-- إضافة حقل المستفيد هنا -->
+                    <div class="mb-3">
+                        <label for="beneficiary_name" class="form-label">المستفيد (اختياري)</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="beneficiary_name" placeholder="اكتب اسم المستفيد..." autocomplete="off">
+                            <input type="hidden" id="beneficiary_id" name="beneficiary_id">
+                            <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#addQuickBeneficiaryModal">
+                                <i class="fas fa-plus"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">يمكنك البحث عن مستفيد أو إدخال اسم جديد</div>
+                    </div>
+                    
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <label for="category_id" class="form-label">التصنيف</label>
@@ -125,9 +138,41 @@
         </div>
     </div>
 </div>
+
+
+<!-- نافذة إضافة مستفيد سريعة -->
+<div class="modal fade" id="addQuickBeneficiaryModal" tabindex="-1" aria-labelledby="addQuickBeneficiaryModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="addQuickBeneficiaryModalLabel">إضافة مستفيد جديد</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="quick_beneficiary_name" class="form-label">الاسم</label>
+                    <input type="text" class="form-control" id="quick_beneficiary_name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="quick_beneficiary_phone" class="form-label">رقم الجوال</label>
+                    <input type="tel" class="form-control" id="quick_beneficiary_phone">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                <button type="button" class="btn btn-primary" id="save_quick_beneficiary">إضافة</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+
 {% endblock %}
 
 {% block scripts %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 <script src="{{ url_for('static', filename='js/create_ticket.js') }}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -135,6 +180,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const customPriorityContainer = document.getElementById('custom_priority_container');
     const customPrioritySelect = document.getElementById('custom_priority');
     const maintenanceContainer = document.getElementById('maintenance_container');
+    const beneficiaryNameInput = document.getElementById('beneficiary_name');
+    const beneficiaryIdInput = document.getElementById('beneficiary_id');
     
     // دالة لاظهار/اخفاء حقل الوقت المخصص
     function toggleCustomPriority() {
@@ -154,6 +201,91 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // التطبيق الأولي عند تحميل الصفحة
     toggleCustomPriority();
+    
+    // تهيئة البحث التلقائي للمستفيدين
+    $(beneficiaryNameInput).autocomplete({
+        source: function(request, response) {
+            $.getJSON("/api/beneficiaries/search", { term: request.term }, function(data) {
+                response(data);
+            });
+        },
+        minLength: 2,
+        select: function(event, ui) {
+            // تعديل هنا: دع jQuery UI يتعامل مع تعيين القيمة
+            beneficiaryIdInput.value = ui.item.id;
+            return true;
+        },
+        response: function(event, ui) {
+            // للتحقق من أن البحث يعمل
+            console.log('تم الرد بـ', ui.content.length, 'نتائج');
+        }
+    });
+
+    
+    // إضافة مستفيد جديد من النافذة المنبثقة
+    document.getElementById('save_quick_beneficiary').addEventListener('click', function() {
+        const name = document.getElementById('quick_beneficiary_name').value;
+        const phone = document.getElementById('quick_beneficiary_phone').value;
+        
+        if (!name) {
+            alert('يرجى إدخال اسم المستفيد');
+            return;
+        }
+        
+        // الحصول على CSRF token
+        const csrfToken = document.querySelector('input[name="csrf_token"]').value;
+        
+        // إرسال طلب AJAX لإضافة المستفيد
+        fetch('/api/beneficiaries/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRFToken': csrfToken  // إضافة CSRF token
+            },
+            body: JSON.stringify({
+                name: name,
+                phone: phone
+            })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('حدث خطأ أثناء إضافة المستفيد');
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.status === 'success') {
+                // تحديث حقل المستفيد
+                beneficiaryNameInput.value = data.beneficiary.name;
+                beneficiaryIdInput.value = data.beneficiary.id;
+                
+                // إغلاق النافذة المنبثقة
+                const modal = bootstrap.Modal.getInstance(document.getElementById('addQuickBeneficiaryModal'));
+                modal.hide();
+                
+                // مسح حقول النافذة المنبثقة
+                document.getElementById('quick_beneficiary_name').value = '';
+                document.getElementById('quick_beneficiary_phone').value = '';
+                
+                // عرض رسالة نجاح
+                alert('تم إضافة المستفيد بنجاح');
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('حدث خطأ أثناء إضافة المستفيد');
+        });
+    });
+
+    // مسح معرف المستفيد عند تغيير النص
+    beneficiaryNameInput.addEventListener('input', function() {
+        if (this.value === '') {
+            beneficiaryIdInput.value = '';
+        }
+    });
 });
 </script>
 {% endblock %}

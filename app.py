@@ -6,15 +6,23 @@ Fixltpro - نظام بلاغات الدعم الفني - تطبيق Flask مع S
 """
 
 from flask import Flask, render_template, request, redirect, url_for, flash, session, send_file, send_from_directory, jsonify, make_response
-from flask_sqlalchemy import SQLAlchemy
-from flask_wtf import CSRFProtect  # إضافة حماية CSRF
-from flask_wtf import FlaskForm  # استيراد FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, validators  # استيراد حقول النموذج
+from flask_sqlalchemy import SQLAlchemy # type: ignore
+from flask_wtf import CSRFProtect  # type: ignore # إضافة حماية CSRF
+from flask_wtf import FlaskForm  # type: ignore # استيراد FlaskForm
+from wtforms import StringField, PasswordField, BooleanField, validators  # type: ignore # استيراد حقول النموذج
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from datetime import datetime, timedelta
 from functools import wraps
+from fpdf import FPDF # type: ignore
+import arabic_reshaper
+from bidi.algorithm import get_display
+import io
 import os
+import openpyxl
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+import io
 
 
 # إنشاء تطبيق Flask
@@ -160,7 +168,7 @@ class Section(db.Model):
     
     tickets = db.relationship('Ticket', backref='section', lazy='dynamic')
     
-
+# تعديل نموذج البلاغ لإضافة حقل المستفيد
 class Ticket(db.Model):
     """نموذج البلاغ"""
     __tablename__ = 'tickets'
@@ -180,6 +188,7 @@ class Ticket(db.Model):
     section_id = db.Column(db.Integer, db.ForeignKey('sections.id'))
     priority_id = db.Column(db.Integer, db.ForeignKey('priorities.id'), nullable=False)
     status_id = db.Column(db.Integer, db.ForeignKey('statuses.id'), nullable=False)
+    beneficiary_id = db.Column(db.Integer, db.ForeignKey('beneficiaries.id'))  # إضافة حقل المستفيد
     
     comments = db.relationship('Comment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
     attachments = db.relationship('Attachment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
@@ -190,6 +199,7 @@ class Ticket(db.Model):
         if not self.due_date:
             return False
         return datetime.utcnow() > self.due_date
+
 
 
 class Attachment(db.Model):
@@ -228,6 +238,20 @@ class LoginForm(FlaskForm):
     username = StringField('اسم المستخدم', validators=[validators.DataRequired()])
     password = PasswordField('كلمة المرور', validators=[validators.DataRequired()])
     remember = BooleanField('تذكرني')
+
+
+class Beneficiary(db.Model):
+    """نموذج المستفيد"""
+    __tablename__ = 'beneficiaries'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    phone = db.Column(db.String(20))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # إضافة علاقة مع البلاغات
+    tickets = db.relationship('Ticket', backref='beneficiary', lazy='dynamic')
 
 
 # مزخرفات للتحقق من تسجيل الدخول والصلاحيات
@@ -451,7 +475,7 @@ def assign_ticket(ticket_id):
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 
-# التعديل الأول: تغيير الوظيفة create_ticket
+# تعديل create_ticket لدعم اختيار المستفيد
 @app.route('/ticket/create', methods=['GET', 'POST'])
 @login_required('employee')
 def create_ticket():
@@ -472,6 +496,7 @@ def create_ticket():
         priority_id = request.form.get('priority_id', type=int)
         assigned_to_id = request.form.get('assigned_to_id')  # معرف فني الصيانة المعين
         custom_priority = request.form.get('custom_priority') # المدة المخصصة بالأيام
+        beneficiary_id = request.form.get('beneficiary_id')  # معرف المستفيد
         
         # تحويل القيم إلى None إذا كانت '0' أو فارغة
         if subcategory_id in ['0', '', None]:
@@ -493,6 +518,11 @@ def create_ticket():
             assigned_to_id = None
         else:
             assigned_to_id = int(assigned_to_id)
+            
+        if beneficiary_id in ['0', '', None]:
+            beneficiary_id = None
+        else:
+            beneficiary_id = int(beneficiary_id)
         
         if not all([description, category_id]):
             flash('يرجى ملء جميع الحقول المطلوبة', 'error')
@@ -563,7 +593,8 @@ def create_ticket():
             priority_id=priority_id,
             assigned_to_id=assigned_to_id,  # تعيين الفني المسؤول
             status_id=status.id,
-            due_date=due_date
+            due_date=due_date,
+            beneficiary_id=beneficiary_id  # تعيين المستفيد
         )
         
         db.session.add(ticket)
@@ -634,7 +665,6 @@ def create_ticket():
     response.headers['Expires'] = '-1'
     
     return response
-
 
 @app.route('/search_ticket')
 @login_required()
@@ -845,6 +875,8 @@ def setup_page():
     return render_template('setup_page.html')
 
 
+# تعديل دالة setup_api في app.py لإضافة جدول المستفيدين
+
 def setup_api():
     """واجهة برمجة التطبيقات لإعداد قاعدة البيانات"""
     try:
@@ -894,7 +926,7 @@ def setup_api():
         low_priority = TicketPriority(name='منخفضة', response_time=120, color='#00AA00')
         custom_priority = TicketPriority(name='بوقت محدد', response_time=0, color='#16a085', is_custom=True)
         
-        db.session.add_all([high_priority, medium_priority, low_priority])
+        db.session.add_all([high_priority, medium_priority, low_priority, custom_priority])
         db.session.flush()
         
         # إنشاء الحالات
@@ -964,6 +996,18 @@ def setup_api():
         db.session.add_all(sections)
         db.session.flush()
         
+        # إنشاء المستفيدين (عينة)
+        beneficiaries = [
+            Beneficiary(name='أحمد محمد', phone='0500000010'),
+            Beneficiary(name='محمد علي', phone='0500000011'),
+            Beneficiary(name='خالد عبدالله', phone='0500000012'),
+            Beneficiary(name='سارة أحمد', phone='0500000013'),
+            Beneficiary(name='فاطمة محمد', phone='0500000014')
+        ]
+        
+        db.session.add_all(beneficiaries)
+        db.session.flush()
+        
         # حفظ التغييرات
         db.session.commit()
         
@@ -978,7 +1022,8 @@ def setup_api():
             section_id=sections[4].id,  # المحاسبة
             priority_id=high_priority.id,
             status_id=new_status.id,
-            due_date=datetime.utcnow() + timedelta(hours=24)
+            due_date=datetime.utcnow() + timedelta(hours=24),
+            beneficiary_id=beneficiaries[3].id  # سارة أحمد
         )
         
         ticket2 = Ticket(
@@ -991,7 +1036,8 @@ def setup_api():
             section_id=sections[7].id,  # البنية التحتية
             priority_id=medium_priority.id,
             status_id=new_status.id,
-            due_date=datetime.utcnow() + timedelta(hours=72)
+            due_date=datetime.utcnow() + timedelta(hours=72),
+            beneficiary_id=beneficiaries[1].id  # محمد علي
         )
         
         db.session.add_all([ticket1, ticket2])
@@ -2181,7 +2227,541 @@ def delete_attachment(attachment_id):
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 
+@app.route('/admin/beneficiaries')
+@login_required('admin')
+def admin_beneficiaries():
+    """صفحة إدارة المستفيدين للمدير"""
+    beneficiaries = Beneficiary.query.all()
+    return render_template('admin_beneficiaries.html', beneficiaries=beneficiaries)
 
+
+
+@app.route('/admin/beneficiaries/add', methods=['POST'])
+@login_required('admin')
+def admin_add_beneficiary():
+    """إضافة مستفيد جديد"""
+    name = request.form.get('name')
+    phone = request.form.get('phone', '')
+    
+    if not name:
+        flash('يرجى إدخال اسم المستفيد', 'danger')
+        return redirect(url_for('admin_beneficiaries'))
+    
+    beneficiary = Beneficiary(
+        name=name,
+        phone=phone
+    )
+    
+    db.session.add(beneficiary)
+    db.session.commit()
+    
+    flash('تم إضافة المستفيد بنجاح', 'success')
+    return redirect(url_for('admin_beneficiaries'))
+
+
+@app.route('/admin/beneficiaries/edit', methods=['POST'])
+@login_required('admin')
+def admin_edit_beneficiary():
+    """تعديل بيانات مستفيد"""
+    beneficiary_id = request.form.get('beneficiary_id', type=int)
+    name = request.form.get('name')
+    phone = request.form.get('phone', '')
+    
+    beneficiary = Beneficiary.query.get_or_404(beneficiary_id)
+    
+    beneficiary.name = name
+    beneficiary.phone = phone
+    
+    db.session.commit()
+    
+    flash('تم تحديث بيانات المستفيد بنجاح', 'success')
+    return redirect(url_for('admin_beneficiaries'))
+
+
+
+@app.route('/api/beneficiaries/add', methods=['POST'])
+@login_required()
+@csrf.exempt  # إعفاء هذا المسار من التحقق من CSRF
+def api_add_beneficiary():
+    """إضافة مستفيد جديد من خلال واجهة برمجة التطبيقات"""
+    data = request.json
+    
+    if not data or not data.get('name'):
+        return jsonify({'status': 'error', 'message': 'يرجى إدخال اسم المستفيد'}), 400
+    
+    beneficiary = Beneficiary(
+        name=data.get('name'),
+        phone=data.get('phone', '')
+    )
+    
+    db.session.add(beneficiary)
+    db.session.commit()
+    
+    return jsonify({
+        'status': 'success', 
+        'message': 'تم إضافة المستفيد بنجاح',
+        'beneficiary': {
+            'id': beneficiary.id,
+            'name': beneficiary.name
+        }
+    })
+
+
+
+@app.route('/admin/beneficiaries/delete', methods=['POST'])
+@login_required('admin')
+def admin_delete_beneficiary():
+    """حذف مستفيد"""
+    beneficiary_id = request.form.get('beneficiary_id', type=int)
+    
+    beneficiary = Beneficiary.query.get_or_404(beneficiary_id)
+    
+    # التحقق من وجود بلاغات مرتبطة بالمستفيد
+    if beneficiary.tickets.count() > 0:
+        # تحديث البلاغات لإزالة رابط المستفيد
+        Ticket.query.filter_by(beneficiary_id=beneficiary_id).update({'beneficiary_id': None})
+        db.session.flush()
+    
+    # حذف المستفيد
+    db.session.delete(beneficiary)
+    db.session.commit()
+    
+    flash('تم حذف المستفيد بنجاح', 'success')
+    return redirect(url_for('admin_beneficiaries'))
+
+
+@app.route('/api/beneficiaries/search')
+@login_required()
+def search_beneficiaries():
+    """البحث عن المستفيدين للاستخدام في الواجهة"""
+    search_term = request.args.get('term', '')
+    
+    if not search_term:
+        return jsonify([])
+    
+    # البحث عن المستفيدين الذين يطابق اسمهم مصطلح البحث
+    beneficiaries = Beneficiary.query.filter(Beneficiary.name.like(f'%{search_term}%')).limit(10).all()
+    
+    # إرجاع النتائج بتنسيق مناسب لـ autocomplete
+    results = []
+    for beneficiary in beneficiaries:
+        # تعديل هنا: استخدام المفاتيح الصحيحة للتوافق مع jQuery UI Autocomplete
+        results.append({
+            'id': beneficiary.id,
+            'value': beneficiary.name,
+            'label': f"{beneficiary.name} {f'- {beneficiary.phone}' if beneficiary.phone else ''}"
+        })
+    
+    return jsonify(results)
+
+
+
+@app.route('/admin/beneficiaries/export')
+@login_required('admin')
+def export_beneficiaries():
+    """تصدير قائمة المستفيدين كملف XLSX"""
+    # إنشاء ملف إكسل جديد
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "المستفيدون"
+    
+    # إضافة ترويسة للجدول
+    ws.append(["الاسم", "رقم الجوال"])
+    
+    # تنسيق الخط للترويسة
+    header_font = Font(bold=True, size=12)
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal='center')
+    
+    # إضافة بيانات المستفيدين
+    beneficiaries = Beneficiary.query.all()
+    for beneficiary in beneficiaries:
+        ws.append([beneficiary.name, beneficiary.phone or ""])
+    
+    # ضبط عرض الأعمدة
+    ws.column_dimensions['A'].width = 30
+    ws.column_dimensions['B'].width = 20
+    
+    # إنشاء ملف في الذاكرة
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    # إعداد الاستجابة
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = 'attachment; filename=beneficiaries.xlsx'
+    response.headers['Content-Type'] = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    
+    return response
+
+
+@app.route('/admin/beneficiaries/import', methods=['POST'])
+@login_required('admin')
+def import_beneficiaries():
+    """استيراد قائمة المستفيدين من ملف XLSX"""
+    if 'file' not in request.files:
+        flash('لم يتم تحديد ملف', 'danger')
+        return redirect(url_for('admin_beneficiaries'))
+    
+    file = request.files['file']
+    
+    if file.filename == '':
+        flash('لم يتم اختيار ملف', 'danger')
+        return redirect(url_for('admin_beneficiaries'))
+    
+    if not file.filename.endswith('.xlsx'):
+        flash('يرجى اختيار ملف بتنسيق XLSX', 'danger')
+        return redirect(url_for('admin_beneficiaries'))
+    
+    try:
+        # قراءة الملف
+        wb = openpyxl.load_workbook(file)
+        ws = wb.active
+        
+        # إضافة المستفيدين
+        added_count = 0
+        for row in ws.iter_rows(min_row=2, values_only=True):  # نبدأ من الصف الثاني (بعد الترويسة)
+            if len(row) >= 1 and row[0]:  # التأكد من وجود اسم على الأقل
+                name = str(row[0]).strip()
+                phone = str(row[1]).strip() if len(row) > 1 and row[1] else ""
+                
+                # التحقق من وجود المستفيد بالفعل
+                existing = Beneficiary.query.filter_by(name=name).first()
+                if not existing:
+                    beneficiary = Beneficiary(
+                        name=name,
+                        phone=phone
+                    )
+                    db.session.add(beneficiary)
+                    added_count += 1
+        
+        db.session.commit()
+        flash(f'تم استيراد {added_count} مستفيد بنجاح', 'success')
+        
+    except Exception as e:
+        app.logger.error(f"خطأ في استيراد المستفيدين: {str(e)}")
+        flash('حدث خطأ أثناء استيراد الملف', 'danger')
+    
+    return redirect(url_for('admin_beneficiaries'))
+
+
+
+# قسم نظام الطباعة من النظام
+
+
+
+@app.route('/ticket/<int:ticket_id>/maintenance_form_pdf', methods=['GET'])
+@login_required()
+def generate_maintenance_form_pdf(ticket_id):
+    """إنشاء نموذج طلب صيانة بصيغة PDF محسّن على صفحة واحدة"""
+    # استعلام عن البلاغ
+    ticket = Ticket.query.get_or_404(ticket_id)
+    
+    # إنشاء ملف PDF جديد
+    pdf = FPDF(orientation='P', unit='mm', format='A4')
+    pdf.add_page()
+    
+    # إضافة الخطوط
+    pdf.add_font('Arial', '', 'static/fonts/arial.ttf', uni=True)
+    pdf.add_font('Arial', 'B', 'static/fonts/arialbd.ttf', uni=True)
+    
+    # دالة مساعدة للكتابة بالعربية
+    def arabic_text(text, rtl=True):
+        if not text:
+            return ""
+        if rtl:
+            reshaped_text = arabic_reshaper.reshape(str(text))
+            return get_display(reshaped_text)
+        return str(text)
+    
+    # تحديد الألوان المستخدمة
+    header_color = (0, 73, 144)  # أزرق غامق
+    subheader_color = (0, 112, 192)  # أزرق فاتح
+    accent_color = (242, 242, 242)  # رمادي فاتح
+    
+    # --- ترويسة النموذج ---
+    # إعداد الترويسة على ثلاثة أعمدة: اسم الجهة (يمين)، الشعار (وسط)، رقم البلاغ والتاريخ (يسار)
+    
+    # العمود الأيمن - اسم الجهة
+    pdf.set_font('Arial', 'B', 14)
+    pdf.set_text_color(header_color[0], header_color[1], header_color[2])
+    pdf.set_xy(110, 10)
+    pdf.cell(90, 6, arabic_text('المملكة العربية السعودية'), 0, 1, 'R')
+    pdf.set_xy(110, 16)
+    pdf.cell(90, 6, arabic_text('وزارة الداخلية'), 0, 1, 'R')
+    pdf.set_xy(110, 22)
+    pdf.set_font('Arial', '', 12)
+    pdf.cell(90, 6, arabic_text('المديرية العامة للسجون'), 0, 1, 'R')
+    pdf.set_xy(110, 28)
+    pdf.cell(90, 6, arabic_text('مديرية السجون بمنطقة جازان'), 0, 1, 'R')
+    
+    # العمود الأوسط - الشعار
+    logo_path = os.path.join(app.root_path, 'static/images/moi_logo.png')
+    if os.path.exists(logo_path):
+        pdf.image(logo_path, x=85, y=10, w=30)
+    
+    # العمود الأيسر - رقم البلاغ والتاريخ
+    pdf.set_font('Arial', 'B', 12)
+    pdf.set_text_color(0, 0, 0)
+    pdf.set_xy(10, 15)
+    pdf.cell(60, 6, arabic_text(f'رقم البلاغ: {ticket.id}'), 0, 1, 'L')
+    
+    current_date = datetime.now().strftime('%Y/%m/%d')
+    pdf.set_xy(10, 25)
+    pdf.cell(60, 6, arabic_text(f'التاريخ: {current_date}'), 0, 1, 'L')
+    
+    # عنوان النموذج
+    pdf.set_y(45)
+    pdf.set_font('Arial', 'B', 18)
+    pdf.set_text_color(header_color[0], header_color[1], header_color[2])
+    pdf.cell(0, 10, arabic_text('نموذج طلب صيانة الدعم الفني'), 0, 1, 'C')
+    
+    # توحيد حجم خط رؤوس الجداول - استخدام نفس حجم وأسلوب خط "بيانات مقدم الطلب"
+    # حجم الخط للعناوين
+    header_font_size = 12
+    
+    # ---- معلومات مقدم الطلب ----
+    pdf.set_y(60)
+    pdf.set_fill_color(header_color[0], header_color[1], header_color[2])
+    pdf.set_text_color(255, 255, 255)
+    pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+    pdf.set_font('Arial', 'B', header_font_size)  # حجم موحد للعناوين
+    pdf.cell(190, 8, arabic_text('بيانات مقدم الطلب'), 0, 1, 'C')
+    
+    # إعادة تعيين لون النص
+    pdf.set_text_color(0, 0, 0)
+    
+    # إطار معلومات مقدم الطلب
+    y_position = pdf.get_y()
+    pdf.rect(10, y_position, 190, 25)
+    
+    # معلومات مقدم الطلب بتصميم مبسط لتوفير المساحة
+    pdf.set_font('Arial', 'B', 10)
+    pdf.set_xy(150, y_position + 2)
+    pdf.cell(40, 6, arabic_text('الاسم:'), 0, 0, 'R')
+    pdf.set_font('Arial', '', 10)
+    pdf.set_xy(10, y_position + 2)
+    pdf.cell(140, 6, arabic_text(ticket.beneficiary.name if ticket.beneficiary else '______________________'), 0, 1, 'R')
+    
+    pdf.set_font('Arial', 'B', 10)
+    pdf.set_xy(150, y_position + 10)
+    pdf.cell(40, 6, arabic_text('الإدارة/القسم:'), 0, 0, 'R')
+    pdf.set_font('Arial', '', 10)
+    pdf.set_xy(10, y_position + 10)
+    department_name = ticket.department.name if ticket.department else '_____________'
+    section_name = ticket.section.name if ticket.section else '_____________'
+    pdf.cell(140, 6, arabic_text(f'{department_name} / {section_name}'), 0, 1, 'R')
+    
+    pdf.set_font('Arial', 'B', 10)
+    pdf.set_xy(150, y_position + 18)
+    pdf.cell(40, 6, arabic_text('رقم الجوال:'), 0, 0, 'R')
+    pdf.set_font('Arial', '', 10)
+    pdf.set_xy(10, y_position + 18)
+    
+    beneficiary_phone = ticket.beneficiary.phone if ticket.beneficiary and ticket.beneficiary.phone else '______________________'
+    pdf.cell(140, 6, arabic_text(beneficiary_phone), 0, 1, 'R')
+    
+    # ---- طريقة استلام البلاغ ----
+    pdf.set_y(pdf.get_y() + 2)
+    pdf.set_fill_color(header_color[0], header_color[1], header_color[2])
+    pdf.set_text_color(255, 255, 255)
+    pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+    pdf.set_font('Arial', 'B', header_font_size)  # حجم موحد للعناوين
+    pdf.cell(190, 8, arabic_text('طريقة استلام البلاغ'), 0, 1, 'C')
+    
+    # إعادة تعيين لون النص
+    pdf.set_text_color(0, 0, 0)
+    
+    # تعديل طريقة استلام البلاغ ليكون كل خيار مع مربعه الخاص
+    y_position = pdf.get_y()
+    pdf.rect(10, y_position, 190, 12)
+    
+    # خيارات طريقة استلام البلاغ
+    options = ['حضور شخصي', 'البريد الإلكتروني', 'واتساب', 'الاتصال']
+    
+    # تقسيم الخيارات إلى صف واحد بمسافات متساوية
+    option_width = 47.5  # 190 ÷ 4 = 47.5 لكل خيار
+    
+    for i, option in enumerate(options):
+        # حساب موضع كل خيار
+        x_pos = 10 + (i * option_width)
+        
+        # نص الخيار - مع مراعاة العرض المناسب للغة العربية
+        text_width = pdf.get_string_width(arabic_text(option))
+        
+        # تحديد موضع المربع ليكون يمين النص (في اتجاه RTL)
+        checkbox_x = x_pos + (option_width - text_width - 8)
+        
+        # نرسم المربع
+        pdf.set_xy(checkbox_x, y_position + 4)
+        pdf.rect(checkbox_x, y_position + 4, 4, 4, 'D')
+        
+        # ثم نكتب النص بعد المربع
+        pdf.set_xy(checkbox_x + 6, y_position + 3)
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(text_width, 6, arabic_text(option), 0, 0, 'L')
+    
+    pdf.ln(12)
+    
+    # ---- معلومات العطل ----
+    pdf.set_y(pdf.get_y() + 2)
+    pdf.set_fill_color(header_color[0], header_color[1], header_color[2])
+    pdf.set_text_color(255, 255, 255)
+    pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+    pdf.set_font('Arial', 'B', header_font_size)  # حجم موحد للعناوين
+    pdf.cell(190, 8, arabic_text('تصنيف العطل'), 0, 1, 'C')
+    
+    # إعادة تعيين لون النص
+    pdf.set_text_color(0, 0, 0)
+    
+    # إطار تصنيفات العطل - نحافظ على النمط السابق
+    y_position = pdf.get_y()
+    pdf.rect(10, y_position, 190, 35)
+    
+    # تقسيم التصنيفات: 3 على اليمين و2 على اليسار
+    # العمود الأيمن - 3 تصنيفات
+    right_categories = [
+        {'name': 'أجهزة الحاسب', 'match': 'أجهزة'},
+        {'name': 'البرمجيات', 'match': 'برمجيات'},
+        {'name': 'الشبكات', 'match': 'شبكات'}
+    ]
+    
+    # العمود الأيسر - 2 تصنيفات
+    left_categories = [
+        {'name': 'الطابعات', 'match': 'طابعات'},
+        {'name': 'أخرى ..............................', 'match': 'أخرى'}
+    ]
+    
+    # رسم العمود الأيمن (3 تصنيفات)
+    for i, category in enumerate(right_categories):
+        y_offset = y_position + (i * 10) + 5
+        
+        # نص التصنيف
+        pdf.set_xy(110, y_offset)
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(80, 6, arabic_text(category['name']), 0, 0, 'R')
+        
+        # مربع الاختيار - قبل النص (على يمين النص)
+        checkbox_x = 190
+        pdf.set_xy(190, y_offset)
+        pdf.rect(190, y_offset, 4, 4, 'D')
+        
+        # تحديد ما إذا كان يجب وضع علامة في المربع
+        checked = False
+        if ticket.category:
+            category_lower = ticket.category.name.lower()
+            checked = category['match'] in category_lower
+        
+        if checked:
+            pdf.set_xy(190, y_offset)
+            pdf.cell(4, 4, 'X', 0, 0, 'C')
+    
+    # رسم العمود الأيسر (2 تصنيفات)
+    for i, category in enumerate(left_categories):
+        y_offset = y_position + (i * 10) + 5
+        
+        # نص التصنيف
+        pdf.set_xy(10, y_offset)
+        pdf.set_font('Arial', '', 10)
+        pdf.cell(80, 6, arabic_text(category['name']), 0, 0, 'R')
+        
+        # مربع الاختيار - قبل النص (على يمين النص)
+        checkbox_x = 90
+        pdf.set_xy(90, y_offset)
+        pdf.rect(90, y_offset, 4, 4, 'D')
+        
+        # تحديد ما إذا كان يجب وضع علامة في المربع
+        checked = False
+        if ticket.category:
+            category_lower = ticket.category.name.lower()
+            checked = category['match'] in category_lower
+        
+        if checked:
+            pdf.set_xy(90, y_offset)
+            pdf.cell(4, 4, 'X', 0, 0, 'C')
+    
+    # ---- تفاصيل المشكلة والتقرير ----
+    # تعديل نظام المساحات لتكون متساوية بين وصف المشكلة وتقرير الفني
+    section_height = 30  # نفس ارتفاع القسمين
+    
+    # وصف المشكلة
+    pdf.set_y(y_position + 40)
+    pdf.set_fill_color(header_color[0], header_color[1], header_color[2])
+    pdf.set_text_color(255, 255, 255)
+    pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+    pdf.set_font('Arial', 'B', header_font_size)  # حجم موحد للعناوين
+    pdf.cell(190, 8, arabic_text('وصف المشكلة'), 0, 1, 'C')
+    
+    # إعادة تعيين لون النص
+    pdf.set_text_color(0, 0, 0)
+    
+    # مربع وصف المشكلة
+    y_position = pdf.get_y()
+    pdf.rect(10, y_position, 190, section_height, 'D')
+    
+    # إضافة وصف المشكلة
+    pdf.set_xy(15, y_position + 3)
+    pdf.set_font('Arial', '', 10)
+    
+    # تقسيم الوصف إلى أسطر وعرضه بطريقة مناسبة
+    description_lines = ticket.description.split('\n')
+    for line in description_lines[:5]:  # عرض حتى 5 أسطر
+        pdf.multi_cell(180, 5, arabic_text(line), 0, 'R')
+    
+    # ---- تقرير الفني ----
+    pdf.set_y(y_position + section_height + 5)
+    pdf.set_fill_color(subheader_color[0], subheader_color[1], subheader_color[2])
+    pdf.set_text_color(255, 255, 255)
+    pdf.rect(10, pdf.get_y(), 190, 8, 'F')
+    pdf.set_font('Arial', 'B', header_font_size)  # حجم موحد للعناوين
+    pdf.cell(190, 8, arabic_text('تقرير فني الصيانة'), 0, 1, 'C')
+    
+    # إعادة تعيين لون النص
+    pdf.set_text_color(0, 0, 0)
+    
+    # مربع تقرير الفني
+    y_position = pdf.get_y()
+    pdf.rect(10, y_position, 190, section_height, 'D')
+    
+    # بيانات وتوقيعات الفني ومدير الدعم الفني
+    # توقيع الفني
+    pdf.set_y(y_position + section_height + 5)
+    pdf.set_font('Arial', 'B', 10)
+    
+    # العمود الأيمن - اسم الفني
+    pdf.set_xy(110, pdf.get_y())
+    pdf.cell(80, 6, arabic_text('اسم الفني: ' + (ticket.assignee.name if ticket.assignee else '_________________')), 0, 0, 'R')
+    
+    # العمود الأيسر - توقيع الفني
+    pdf.set_xy(10, pdf.get_y())
+    pdf.cell(80, 6, arabic_text('التوقيع: _________________'), 0, 1, 'R')
+    
+    # توقيع مدير الدعم الفني - في السطر التالي مباشرة
+    pdf.set_y(pdf.get_y() + 10)
+    
+    # العمود الأيمن - مدير الدعم الفني
+    pdf.set_xy(110, pdf.get_y())
+    pdf.cell(80, 6, arabic_text('مدير قسم الدعم الفني: _________________'), 0, 0, 'R')
+    
+    # العمود الأيسر - التاريخ
+    pdf.set_xy(10, pdf.get_y())
+    pdf.cell(80, 6, arabic_text('التاريخ: _____/_____/________هـ'), 0, 1, 'R')
+    
+    # إنشاء الملف في الذاكرة - هذا هو الجزء الذي يحتاج إلى تعديل
+    pdf_output = io.BytesIO()
+    
+    # استخدم الطريقة الصحيحة لإخراج PDF إلى كائن BytesIO
+    pdf_data = pdf.output(dest='S').encode('latin1')  # Output as string then encode
+    pdf_output.write(pdf_data)
+    pdf_output.seek(0)
+    
+    # إرسال الملف كاستجابة
+    response = make_response(pdf_output.getvalue())
+    response.headers['Content-Type'] = 'application/pdf'
+    response.headers['Content-Disposition'] = f'inline; filename=maintenance_form_{ticket_id}.pdf'
+    
+    return response
 
 # تشغيل التطبيق
 if __name__ == '__main__':
