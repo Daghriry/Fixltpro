@@ -812,6 +812,7 @@ def change_status(ticket_id):
     return redirect(url_for('view_ticket', ticket_id=ticket_id))
 
 
+# تعديل مسار maintenance_dashboard ليشمل البلاغات المتأخرة
 @app.route('/maintenance/dashboard')
 @login_required('maintenance')
 def maintenance_dashboard():
@@ -856,6 +857,11 @@ def maintenance_dashboard():
         elif ticket.priority.is_custom:
             priorities_count['custom'] += 1
     
+    # الحصول على البلاغات المتأخرة المسندة لهذا الفني
+    # فقط البلاغات الجديدة وقيد المعالجة (وليست المكتملة أو المغلقة)
+    open_tickets = new_tickets + in_progress_tickets
+    overdue_tickets, overdue_days = get_overdue_tickets(open_tickets)
+    
     return render_template(
         'maintenance_dashboard.html',
         new_tickets=new_tickets,
@@ -863,9 +869,10 @@ def maintenance_dashboard():
         completed_tickets=completed_tickets,
         closed_tickets=closed_tickets,
         total_assigned=len(assigned_tickets),
-        priorities_count=priorities_count
+        priorities_count=priorities_count,
+        overdue_tickets=overdue_tickets,
+        overdue_days=overdue_days
     )
-
 
 @app.route('/setup')
 def setup_page():
@@ -1242,7 +1249,40 @@ def get_dashboard_statistics():
     
     return statuses_count, priorities_count
 
-# تعديل مسار admin_dashboard ليشمل الإحصائيات الجديدة
+
+
+# إضافة دالة للحصول على البلاغات المتأخرة وعدد أيام التأخير
+def get_overdue_tickets(tickets=None):
+    """الحصول على البلاغات المتأخرة وحساب عدد أيام التأخير"""
+    overdue_tickets = []
+    overdue_days = {}
+    
+    # إذا لم يتم توفير قائمة البلاغات، نستخدم جميع البلاغات المفتوحة
+    if tickets is None:
+        # الحصول على البلاغات المفتوحة (غير مغلقة أو مكتملة)
+        open_statuses = TicketStatus.query.filter(~TicketStatus.name.in_(['مغلق', 'مكتمل'])).all()
+        status_ids = [status.id for status in open_statuses]
+        
+        tickets = Ticket.query.filter(Ticket.status_id.in_(status_ids)).all()
+    
+    now = datetime.utcnow()
+    
+    for ticket in tickets:
+        if ticket.is_overdue():
+            overdue_tickets.append(ticket)
+            
+            # حساب عدد أيام التأخير
+            if ticket.due_date:
+                time_diff = now - ticket.due_date
+                days_late = max(0, time_diff.days)  # لضمان عدم ظهور أيام سالبة
+                overdue_days[ticket.id] = days_late
+    
+    # ترتيب البلاغات المتأخرة حسب عدد أيام التأخير (الأكثر تأخيراً أولاً)
+    overdue_tickets.sort(key=lambda x: overdue_days.get(x.id, 0), reverse=True)
+    
+    return overdue_tickets, overdue_days
+
+# تعديل مسار admin_dashboard ليشمل البلاغات المتأخرة
 @app.route('/admin/dashboard')
 @login_required('admin')
 def admin_dashboard():
@@ -1269,6 +1309,9 @@ def admin_dashboard():
     open_tickets = Ticket.query.join(TicketStatus).filter(TicketStatus.name != 'مغلق').count()
     high_priority = Ticket.query.filter_by(priority_id=1).count()  # نفترض أن الأولوية العالية هي 1
     completed_tickets = Ticket.query.join(TicketStatus).filter(TicketStatus.name == 'مكتمل').count()
+    
+    # الحصول على البلاغات المتأخرة وعدد أيام التأخير
+    overdue_tickets, overdue_days = get_overdue_tickets()
     
     # الحصول على قوائم التصفية
     priorities = TicketPriority.query.all()
@@ -1303,7 +1346,9 @@ def admin_dashboard():
         completed_tickets=completed_tickets,
         priority_colors=priority_colors,
         statuses_count=statuses_count,
-        priorities_count=priorities_count
+        priorities_count=priorities_count,
+        overdue_tickets=overdue_tickets,
+        overdue_days=overdue_days
     )
 
 
@@ -1698,6 +1743,7 @@ def generate_technician_performance(tickets):
     return technicians
 
 
+# تعديل مسار my_tickets ليشمل البلاغات المتأخرة
 @app.route('/my_tickets')
 @login_required('employee')
 def my_tickets():
@@ -1723,13 +1769,20 @@ def my_tickets():
         elif ticket.status.name == 'مغلق':
             closed_tickets += 1
     
+    # الحصول على البلاغات المتأخرة الخاصة بهذا الموظف
+    # فقط البلاغات الجديدة وقيد المعالجة (وليست المكتملة أو المغلقة)
+    user_open_tickets = open_tickets + in_progress_tickets
+    overdue_tickets, overdue_days = get_overdue_tickets(user_open_tickets)
+    
     return render_template(
         'my_tickets.html',
         open_tickets=open_tickets,
         in_progress_tickets=in_progress_tickets,
         completed_tickets=completed_tickets,
         closed_tickets=closed_tickets,
-        total_tickets=len(tickets)
+        total_tickets=len(tickets),
+        overdue_tickets=overdue_tickets,
+        overdue_days=overdue_days
     )
 
 @app.route('/maintenance/reports')

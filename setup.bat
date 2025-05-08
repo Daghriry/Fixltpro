@@ -2,69 +2,59 @@
 setlocal enabledelayedexpansion
 
 echo ======================================================
-echo    Fixltpro IT Support Ticketing System Launcher
+echo    Fixltpro IT Support Ticketing System Setup
 echo ======================================================
 echo.
 
-:: Check if virtual environment exists
-if not exist venv (
-    echo ERROR: Virtual environment not found. Please run setup.bat first.
+:: Check if Python is installed
+echo Checking Python installation...
+python --version
+if %errorlevel% neq 0 (
+    echo ERROR: Python not found. Please install Python 3.8 or newer.
     pause
     exit /b 1
 )
 
+:: Create virtual environment
+echo Creating virtual environment (venv)...
+if exist venv (
+    echo Virtual environment already exists.
+) else (
+    python -m venv venv
+    if %errorlevel% neq 0 (
+        echo ERROR: Failed to create virtual environment.
+        pause
+        exit /b 1
+    )
+    echo Virtual environment created successfully.
+)
+
 :: Activate virtual environment
 echo Activating virtual environment...
-call venv\Scripts\activate.bat
+call venv\Scripts\activate
 if %errorlevel% neq 0 (
     echo ERROR: Failed to activate virtual environment.
     pause
     exit /b 1
 )
 
-:: Get local IP address for display purposes
-for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4 Address"') do (
-    set IP=%%a
-    set IP=!IP:~1!
-    goto :got_ip
-)
+:: Install each required package individually to ensure success
+echo Installing core packages...
 
-:got_ip
-if not defined IP (
-    set IP=127.0.0.1
-)
+echo Installing Flask...
+pip install Flask==2.3.3
+if %errorlevel% neq 0 echo WARNING: Flask installation may have issues
 
-echo.
-echo Application will start at: http://%IP%:5000
-echo To stop the application, press CTRL+C
-echo.
-echo Login information:
-echo - Username: admin
-echo - Password: admin123
-echo.
+echo Installing Flask-SQLAlchemy...
+pip install Flask-SQLAlchemy==3.1.1
+if %errorlevel% neq 0 echo WARNING: Flask-SQLAlchemy installation may have issues
 
-:: Start the application in the background
-start /B python app.py
+echo Installing Flask-WTF...
+pip install Flask-WTF==1.2.1
+if %errorlevel% neq 0 echo WARNING: Flask-WTF installation may have issues
 
-:: Wait for the application to start
-echo Waiting for the application to start...
-timeout /t 3 > nul
-
-:: Open the browser with the application URL
-echo Opening browser to http://%IP%:5000
-start http://%IP%:5000
-
-echo.
-echo Application is running in the background.
-echo Press any key to stop the application...
-pause > nul
-
-:: Find and kill python processes
-echo Stopping the application...
-taskkill /F /IM python.exe /T
-echo Application stopped.
-
-endlocal
+echo Installing Werkzeug...
+pip install Werkzeug==2.3.7
 if %errorlevel% neq 0 echo WARNING: Werkzeug installation may have issues
 
 echo Installing FPDF...

@@ -3,6 +3,40 @@
 {% block content %}
 <h2 class="mb-4">لوحة تحكم فني الصيانة</h2>
 
+<style>
+    /* تنسيقات خاصة بالبلاغات المتأخرة */
+    .overdue-alert {
+        background-color: #ffebee;
+        border-left: 4px solid #f44336;
+    }
+    
+    .overdue-badge {
+        background-color: #f44336 !important;
+        color: white !important;
+    }
+    
+    /* تنسيقات لبطاقات الأولويات */
+    .priority-badge[data-priority="عالية"] {
+        background-color: #e74a3b !important;
+        color: white !important;
+    }
+    
+    .priority-badge[data-priority="متوسطة"] {
+        background-color: #f6c23e !important;
+        color: black !important;
+    }
+    
+    .priority-badge[data-priority="منخفضة"] {
+        background-color: #1cc88a !important;
+        color: white !important;
+    }
+    
+    .priority-badge[data-priority="بوقت محدد"] {
+        background-color: #16a085 !important;
+        color: white !important;
+    }
+</style>
+
 <!-- بطاقات الإحصائيات حسب الحالة -->
 <div class="row mb-4">
     <div class="col">
@@ -46,11 +80,11 @@
     </div>
     
     <div class="col">
-        <div class="card h-100 bg-secondary text-white">
+        <div class="card h-100 bg-danger text-white">
             <div class="card-body text-center">
-                <h5 class="card-title">مغلق</h5>
-                <h2 class="display-4 mb-0">{{ closed_tickets|default(0) }}</h2>
-                <p class="mb-0">بلاغات مغلقة</p>
+                <h5 class="card-title">متأخرة</h5>
+                <h2 class="display-4 mb-0">{{ overdue_tickets|length }}</h2>
+                <p class="mb-0">بلاغات متجاوزة للموعد</p>
             </div>
         </div>
     </div>
@@ -99,6 +133,74 @@
     </div>
 </div>
 
+<!-- البلاغات المتأخرة -->
+<div class="card mb-4">
+    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0"><i class="fas fa-clock me-2"></i>البلاغات المتأخرة</h5>
+        <span class="badge bg-light text-danger">{{ overdue_tickets|length }}</span>
+    </div>
+    <div class="card-body p-0">
+        {% if overdue_tickets %}
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th scope="col">#</th>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">القسم</th>
+                        <th scope="col">الأولوية</th>
+                        <th scope="col">الحالة</th>
+                        <th scope="col">الموعد النهائي</th>
+                        <th scope="col">المدة المتأخرة</th>
+                        <th scope="col">الإجراءات</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ticket in overdue_tickets %}
+                    <tr class="overdue-alert">
+                        <th scope="row">{{ ticket.id }}</th>
+                        <td>{{ ticket.title }}</td>
+                        <td>{{ ticket.category.name }}</td>
+                        <td>
+                            <span class="badge priority-badge" data-priority="{{ ticket.priority.name }}">
+                                {{ ticket.priority.name }}
+                            </span>
+                        </td>
+                        <td>
+                            <span class="badge
+                                {% if ticket.status.name == 'جديد' %}bg-success
+                                {% elif ticket.status.name == 'قيد المعالجة' %}bg-warning text-dark
+                                {% elif ticket.status.name == 'مكتمل' %}bg-info
+                                {% elif ticket.status.name == 'مغلق' %}bg-secondary
+                                {% endif %}">
+                                {{ ticket.status.name }}
+                            </span>
+                        </td>
+                        <td class="text-danger fw-bold">
+                            {{ ticket.due_date.strftime('%Y/%m/%d %H:%M') }}
+                        </td>
+                        <td class="text-danger fw-bold">
+                            {{ overdue_days[ticket.id] }} يوم
+                        </td>
+                        <td>
+                            <a href="{{ url_for('view_ticket', ticket_id=ticket.id) }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-eye me-1"></i>عرض
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center p-4">
+            <i class="fas fa-check-circle fa-3x text-success mb-3"></i>
+            <p class="lead">لا توجد بلاغات متأخرة حالياً</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 {# تحضير بيانات الأولويات لاستخدامها في JavaScript #}
 <script type="text/javascript">
     // تحضير ألوان وبيانات الأولويات
@@ -134,9 +236,7 @@
                 </thead>
                 <tbody>
                     {% for ticket in new_tickets %}
-                    <tr class="{% if ticket.priority.name == 'عالية' %}priority-high
-                        {% elif ticket.priority.name == 'متوسطة' %}priority-medium
-                        {% elif ticket.priority.name == 'منخفضة' %}priority-low{% endif %}">
+                    <tr class="{% if ticket.is_overdue() %}overdue-alert{% endif %}">
                         <th scope="row">{{ ticket.id }}</th>
                         <td>{{ ticket.title }}</td>
                         <td>{{ ticket.category.name }}</td>
@@ -199,9 +299,7 @@
                 </thead>
                 <tbody>
                     {% for ticket in in_progress_tickets %}
-                    <tr class="{% if ticket.priority.name == 'عالية' %}priority-high
-                        {% elif ticket.priority.name == 'متوسطة' %}priority-medium
-                        {% elif ticket.priority.name == 'منخفضة' %}priority-low{% endif %}">
+                    <tr class="{% if ticket.is_overdue() %}overdue-alert{% endif %}">
                         <th scope="row">{{ ticket.id }}</th>
                         <td>{{ ticket.title }}</td>
                         <td>{{ ticket.category.name }}</td>
