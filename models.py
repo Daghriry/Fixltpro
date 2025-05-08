@@ -144,12 +144,27 @@ class Ticket(db.Model):
     comments = db.relationship('Comment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
     attachments = db.relationship('Attachment', backref='ticket', lazy='dynamic', cascade='all, delete-orphan')
     contact_method = db.Column(db.String(50), nullable=True)
+    
+    # إضافات جديدة لنموذج الصيانة
+    problem_solved = db.Column(db.Boolean, nullable=True)  # هل تم حل المشكلة
+    problem_reasons = db.Column(db.Text, nullable=True)  # أسباب عدم حل المشكلة
+    has_maintenance_form = db.Column(db.Boolean, default=False)  # هل تم تعبئة نموذج الصيانة
 
     def is_overdue(self):
         """التحقق مما إذا كان البلاغ متأخراً"""
         if not self.due_date:
             return False
         return datetime.utcnow() > self.due_date
+
+    def get_latest_technician_comment(self):
+        """الحصول على آخر تعليق من الفني المسؤول"""
+        if not self.assigned_to_id:
+            return None
+        
+        return Comment.query.filter_by(
+            ticket_id=self.id,
+            user_id=self.assigned_to_id
+        ).order_by(Comment.created_at.desc()).first()
 
 
 class Attachment(db.Model):
@@ -164,6 +179,9 @@ class Attachment(db.Model):
     
     ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)  # المستخدم الذي قام برفع الملف
+    
+    # حقل جديد لتحديد نوع المرفق
+    attachment_type = db.Column(db.String(50), default='general')  # general, signature, form, etc.
     
     # العلاقة مع المستخدم
     user = db.relationship('User', backref='attachments')
@@ -180,4 +198,27 @@ class Comment(db.Model):
     ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
+    # حقل جديد لتحديد نوع التعليق
+    comment_type = db.Column(db.String(50), default='general')  # general, maintenance_form, system, etc.
+    
     user = db.relationship('User', backref='comments')
+
+
+class MaintenanceForm(db.Model):
+    """نموذج جديد لحفظ بيانات نماذج الصيانة الإلكترونية"""
+    __tablename__ = 'maintenance_forms'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    ticket_id = db.Column(db.Integer, db.ForeignKey('tickets.id'), nullable=False)
+    created_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    # بيانات النموذج
+    problem_solved = db.Column(db.Boolean, nullable=False, default=False)
+    problem_reasons = db.Column(db.Text, nullable=True)
+    signature_attachment_id = db.Column(db.Integer, db.ForeignKey('attachments.id'), nullable=True)
+    
+    # العلاقات
+    ticket = db.relationship('Ticket', backref='maintenance_forms')
+    created_by = db.relationship('User', backref='created_forms')
+    signature = db.relationship('Attachment', foreign_keys=[signature_attachment_id])

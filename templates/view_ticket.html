@@ -2,7 +2,7 @@
 
 {% block head %}
 <!-- إضافة ملف CSS خاص بصفحات البلاغات -->
-<link rel="stylesheet" href="{{ url_for('static', filename='css/ticket_styles.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/view_ticket.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -221,9 +221,10 @@
                     <h5 class="mb-0">نموذج طلب الصيانة</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-grid">
-                        <a href="{{ url_for('generate_maintenance_form_pdf', ticket_id=ticket.id) }}" target="_blank" class="btn btn-info">
-                            <i class="fas fa-file-pdf me-2"></i>عرض نموذج طلب الصيانة
+                    <div class="d-grid gap-2">
+                        <!-- زر النموذج الإلكتروني الجديد -->
+                        <a href="{{ url_for('electronic_maintenance_form', ticket_id=ticket.id) }}" class="btn btn-info">
+                            <i class="fas fa-clipboard-check me-2"></i>تعبئة النموذج الإلكتروني
                         </a>
                     </div>
                 </div>
@@ -515,5 +516,5 @@
 
 {% block scripts %}
 <!-- تحميل ملف JavaScript الخاص بصفحة البلاغ -->
-<script src="{{ url_for('static', filename='js/ticket_page.js') }}"></script>
+<script src="{{ url_for('static', filename='js/view_ticket.js') }}"></script>
 {% endblock %}
